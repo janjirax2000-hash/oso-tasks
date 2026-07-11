@@ -1303,16 +1303,19 @@ function importBackupJson(file){
         await saveState();
         renderTable();
       }
-    });
+    }, 'นำเข้าข้อมูล');
   };
   reader.readAsText(file);
 }
 
 /* ---------------- Confirm Modal ---------------- */
 let confirmCallback = null;
-function showConfirm(title, text, onOk){
+function showConfirm(title, text, onOk, okLabel){
   document.getElementById('confirmTitle').textContent = title;
   document.getElementById('confirmText').textContent = text;
+  const btn = document.getElementById('btnConfirmOk');
+  btn.textContent = okLabel || 'ลบ';
+  btn.className = okLabel ? 'btn btn-primary' : 'btn btn-danger';
   confirmCallback = onOk;
   document.getElementById('confirmOverlay').classList.add('show');
 }
@@ -1440,7 +1443,8 @@ async function migrateLocalDataToFirebase(){
       }
       alert('ย้ายข้อมูลเรียบร้อยแล้ว');
       document.getElementById('teamSettingsOverlay').classList.remove('show');
-    }
+    },
+    'ย้ายข้อมูล'
   );
 }
 
