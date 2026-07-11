@@ -1,0 +1,1725 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>OSO Tasks</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Kanit:wght@400;500;600;700&family=Sarabun:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://accounts.google.com/gsi/client" async defer></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.2/firebase-database-compat.js"></script>
+<style>
+  :root{
+    --bg:#F3F1EA;
+    --bg-grad:radial-gradient(1200px 500px at 10% -10%, #EAF3F1 0%, transparent 60%),
+              radial-gradient(1000px 500px at 100% 0%, #FBF3E4 0%, transparent 55%);
+    --panel:#FFFFFF;
+    --panel-alt:#FBFAF6;
+    --ink:#2E3138;
+    --muted:#8B8577;
+    --line:#E7E1D3;
+    --teal:#5F9EA6;
+    --teal-dark:#3D6A6E;
+    --teal-light:#DCEFEE;
+    --accent:#E8A33D;
+    --radius-lg:20px;
+    --radius-md:14px;
+    --shadow-soft:0 8px 24px rgba(43,60,60,0.08);
+    --shadow-strong:0 20px 50px rgba(0,0,0,0.22);
+
+    --st-inprogress-bg:#C9E0FF; --st-inprogress-fg:#1D4E89;
+    --st-completed-bg:#C3EAD1;  --st-completed-fg:#1E6B3B;
+    --st-monthly-bg:#FFDCB0;    --st-monthly-fg:#8A4E00;
+    --st-specific-bg:#FFF0A8;   --st-specific-fg:#7A5D00;
+    --st-hold-bg:#E3E1DC;       --st-hold-fg:#5B5952;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;background:var(--bg-grad),var(--bg);color:var(--ink);font-family:'Sarabun',sans-serif;}
+  .app-wrap{max-width:1520px;margin:0 auto;padding:16px 16px 60px;}
+
+  /* ---------- warning / status banners ---------- */
+  .origin-warning{
+    display:none; align-items:flex-start; gap:10px;
+    background:#FFF3D6; border:1px solid #F0D18A; color:#7A5A00;
+    border-radius:14px; padding:12px 16px; font-size:13px; line-height:1.6;
+    margin-bottom:14px;
+  }
+  .origin-warning.show{display:flex;}
+
+  .status-bar{
+    display:flex; flex-wrap:wrap; gap:10px; margin-bottom:14px;
+  }
+  .status-pill{
+    flex:1; min-width:230px;
+    display:flex; align-items:center; gap:8px; background:var(--panel);
+    border:1px solid var(--line); border-radius:999px; padding:8px 8px 8px 16px;
+    box-shadow:var(--shadow-soft);
+  }
+  .status-pill .dot{width:9px; height:9px; border-radius:50%; background:#E7A0A0; flex:none;}
+  .status-pill.connected .dot{background:#5CB77E;}
+  .status-pill span.txt{font-size:12.5px; color:var(--ink); font-weight:600; white-space:nowrap; flex:1;}
+  .status-pill button{
+    font-family:'Sarabun',sans-serif; font-size:12px; font-weight:700; border:none; cursor:pointer;
+    border-radius:999px; padding:6px 12px; background:var(--teal-dark); color:#fff; white-space:nowrap;
+  }
+  .status-pill button.secondary{background:var(--teal-light); color:var(--teal-dark);}
+
+  /* ---------- header ---------- */
+  .header-bar{
+    background:linear-gradient(120deg,var(--teal) 0%, var(--teal-dark) 100%);
+    border-radius:var(--radius-lg);
+    padding:20px 24px;
+    color:#fff;
+    position:relative;
+    overflow:hidden;
+    box-shadow:0 10px 28px rgba(61,106,110,0.3);
+    margin-bottom:14px;
+  }
+  .header-bar-inner{display:flex; align-items:center; gap:14px; flex-wrap:wrap;}
+  .header-bar h1{
+    font-family:'Kanit',sans-serif;
+    font-size:28px;
+    font-weight:700;
+    margin:0 0 4px 0;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    letter-spacing:.3px;
+  }
+  .header-bar p{margin:0;font-size:13.5px;opacity:.9;font-weight:400;}
+  .company-logo{
+    height:40px; width:auto; flex:none;
+    background:#fff; border-radius:8px; padding:4px 8px;
+    box-shadow:0 3px 10px rgba(0,0,0,.15);
+  }
+  .flight-path{
+    position:absolute; right:24px; top:50%; transform:translateY(-50%);
+    opacity:.2; width:180px; height:60px; pointer-events:none;
+  }
+
+  /* ---------- toolbar ---------- */
+  .toolbar{
+    display:flex; flex-wrap:wrap; gap:10px; align-items:center;
+    margin-bottom:12px;
+  }
+  .search-box{
+    flex:1; min-width:200px;
+    display:flex; align-items:center; gap:8px;
+    background:var(--panel); border:1px solid var(--line);
+    border-radius:12px; padding:9px 14px;
+    box-shadow:var(--shadow-soft);
+  }
+  .search-box input{
+    border:none; outline:none; font-family:'Sarabun',sans-serif; font-size:14px; width:100%; background:transparent; color:var(--ink);
+  }
+  .btn{
+    font-family:'Sarabun',sans-serif;
+    font-weight:600; font-size:13.5px;
+    border:none; border-radius:10px;
+    padding:9px 15px; cursor:pointer;
+    display:inline-flex; align-items:center; gap:6px;
+    transition:transform .12s ease, box-shadow .12s ease, background .15s ease;
+    white-space:nowrap;
+  }
+  .btn:hover{transform:translateY(-1px);}
+  .btn:active{transform:translateY(0);}
+  .btn-primary{background:var(--teal-dark); color:#fff;}
+  .btn-primary:hover{box-shadow:0 6px 14px rgba(61,106,110,.35);}
+  .btn-ghost{background:var(--panel); color:var(--teal-dark); border:1px solid var(--line); box-shadow:var(--shadow-soft);}
+  .btn-ghost:hover{background:var(--teal-light);}
+  .btn-danger{background:#F7D8D6; color:#9A2E2E;}
+  .btn-danger:hover{background:#F3C3C1;}
+  .btn-sm{padding:6px 10px; font-size:12.5px; border-radius:8px;}
+
+  .chips{display:flex; gap:8px; flex-wrap:wrap;}
+  .chip{
+    padding:7px 13px; border-radius:999px; font-size:13px; font-weight:600;
+    cursor:pointer; border:1px solid var(--line); background:var(--panel); color:var(--muted);
+    user-select:none; transition:.15s;
+  }
+  .chip:hover{border-color:var(--teal);}
+  .chip.active{border-color:transparent; color:#fff; background:var(--teal-dark);}
+  .chips-label{font-size:12px; font-weight:700; color:var(--muted); text-transform:uppercase; letter-spacing:.05em; align-self:center; margin-right:2px;}
+
+  /* ---------- groups / table ---------- */
+  .groups-wrap{display:flex; flex-direction:column; gap:16px;}
+  .group-card{
+    background:var(--panel); border-radius:var(--radius-lg); overflow:hidden;
+    box-shadow:var(--shadow-soft); border:1px solid var(--line);
+  }
+  .group-head{
+    display:flex; align-items:center; justify-content:space-between; gap:10px;
+    padding:14px 18px; cursor:pointer; background:linear-gradient(90deg, var(--teal-light), #fff 85%);
+    user-select:none;
+  }
+  .group-head .gh-left{display:flex; align-items:center; gap:10px;}
+  .group-head .caret{transition:transform .18s ease; color:var(--teal-dark); flex:none;}
+  .group-card.collapsed .caret{transform:rotate(-90deg);}
+  .group-head h3{margin:0; font-family:'Kanit',sans-serif; font-size:16px; color:var(--teal-dark); font-weight:600;}
+  .group-count{
+    background:var(--teal-dark); color:#fff; font-size:11.5px; font-weight:700;
+    border-radius:999px; padding:2px 10px;
+  }
+  .group-body{overflow:auto; max-height:none; -webkit-overflow-scrolling:touch;}
+  .group-card.collapsed .group-body{display:none;}
+
+  table{width:100%; border-collapse:collapse; min-width:1100px;}
+  thead th{
+    background:#FAF9F5; color:var(--teal-dark);
+    font-family:'Kanit',sans-serif; font-weight:600; font-size:13px;
+    text-align:left; padding:10px 14px; position:sticky; top:0; z-index:2;
+    border-bottom:2px solid var(--line); white-space:nowrap;
+  }
+  tbody td{
+    padding:14px; font-size:13.5px; vertical-align:top;
+    border-bottom:1px solid var(--line);
+  }
+  tbody tr:last-child td{border-bottom:none;}
+  tbody tr:hover{background:#FBFAF6;}
+  tbody tr.empty-row td{text-align:center; color:var(--muted); padding:40px; font-size:14px;}
+  .cell-detail{white-space:pre-wrap; max-width:320px; color:#4A4A46; line-height:1.5;}
+  .cell-remark{white-space:pre-wrap; max-width:200px; color:#4A4A46; line-height:1.5;}
+  .muted-dash{color:var(--muted);}
+
+  .pill{
+    display:inline-block; padding:5px 12px; border-radius:999px;
+    font-size:12.5px; font-weight:700; white-space:nowrap;
+  }
+  .pill-project{background:#EFEAE0; color:var(--teal-dark); font-weight:600;}
+  .pill-responsible{background:#F0E9DE; color:#7A5A2E; font-weight:600;}
+  .pill-cal, .pill-overdue{
+    display:inline-flex; align-items:center; gap:4px;
+    font-size:11px; font-weight:700; border-radius:999px; padding:3px 9px; margin-top:6px;
+  }
+  .pill-cal{background:var(--teal-light); color:var(--teal-dark);}
+  .pill-overdue{background:#FBDAD6; color:#B23A2E; margin-left:6px;}
+  .row-actions{display:flex; gap:6px; white-space:nowrap;}
+  .icon-btn{
+    width:30px; height:30px; border-radius:8px; border:1px solid var(--line);
+    background:#fff; cursor:pointer; display:flex; align-items:center; justify-content:center;
+    color:var(--muted); transition:.15s;
+  }
+  .icon-btn:hover{background:var(--teal-light); color:var(--teal-dark); border-color:var(--teal-light);}
+  .icon-btn.danger:hover{background:#F7D8D6; color:#9A2E2E; border-color:#F7D8D6;}
+
+  /* ---------- modal ---------- */
+  .overlay{
+    position:fixed; inset:0; background:rgba(30,28,24,0.5);
+    display:none; align-items:center; justify-content:center; z-index:50; padding:16px;
+    backdrop-filter:blur(2px);
+  }
+  .overlay.show{display:flex;}
+  .modal{
+    background:var(--panel); border-radius:var(--radius-lg); padding:24px 24px;
+    width:100%; max-width:640px; max-height:88vh; overflow:auto;
+    box-shadow:var(--shadow-strong);
+  }
+  .modal.modal-sm{max-width:460px;}
+  .modal h2{
+    font-family:'Kanit',sans-serif; font-size:19px; margin:0 0 16px 0; color:var(--teal-dark);
+  }
+  .modal p.hint-text{font-size:12.5px; color:var(--muted); line-height:1.6; margin:-8px 0 16px;}
+  .field-row{display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-bottom:14px;}
+  .field-row.single{grid-template-columns:1fr;}
+  .field{display:flex; flex-direction:column; gap:6px;}
+  .field label{font-size:12.5px; font-weight:600; color:var(--muted);}
+  .field input, .field select, .field textarea{
+    font-family:'Sarabun',sans-serif; font-size:14px; padding:9px 11px;
+    border:1px solid var(--line); border-radius:9px; outline:none; color:var(--ink);
+    background:#FCFBF8;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus{border-color:var(--teal);}
+  .field textarea{resize:vertical; min-height:70px; font-family:'Sarabun',sans-serif;}
+  .field-check{display:flex; align-items:center; gap:8px; font-size:13.5px; color:var(--ink);}
+  .field-check input{width:16px; height:16px; accent-color:var(--teal-dark); flex:none;}
+  .modal-actions{display:flex; justify-content:flex-end; gap:10px; margin-top:8px; flex-wrap:wrap;}
+
+  .manage-list{display:flex; flex-direction:column; gap:8px; margin-bottom:16px; max-height:260px; overflow:auto;}
+  .manage-item{
+    display:flex; align-items:center; gap:8px; background:#FBFAF6; border:1px solid var(--line);
+    border-radius:10px; padding:6px 8px 6px 12px;
+  }
+  .manage-item input{flex:1; border:none; background:transparent; font-family:'Sarabun',sans-serif; font-size:14px; outline:none; color:var(--ink);}
+  .manage-add{display:flex; gap:8px; flex-wrap:wrap;}
+  .manage-add input{flex:1; min-width:160px;}
+
+  .export-item{
+    display:flex; align-items:center; gap:10px; background:#FBFAF6; border:1px solid var(--line);
+    border-radius:10px; padding:10px 12px;
+  }
+  .export-item input[type="checkbox"]{width:17px; height:17px; accent-color:var(--teal-dark); cursor:pointer; flex:none;}
+  .export-item label{font-size:13.5px; color:var(--ink); cursor:pointer; flex:1;}
+
+  select.status-select{font-weight:600;}
+
+  .confirm-text{font-size:14.5px; color:var(--ink); margin-bottom:20px; line-height:1.6;}
+
+  footer.hint{text-align:center; color:var(--muted); font-size:12px; margin-top:16px; line-height:1.6;}
+
+  @media (max-width:720px){
+    .app-wrap{padding:12px 10px 50px;}
+    .field-row{grid-template-columns:1fr;}
+    .header-bar h1{font-size:21px;}
+    .header-bar p{font-size:12.5px;}
+    .flight-path{display:none;}
+    .status-pill{min-width:100%;}
+    .modal{padding:18px 16px;}
+    .btn{font-size:12.5px; padding:8px 12px;}
+  }
+</style>
+</head>
+<body>
+
+<div class="app-wrap">
+
+  <div class="header-bar">
+    <div class="header-bar-inner">
+      <img src="logo.jpg" alt="Somapa IT" class="company-logo">
+      <div>
+        <h1>
+          <svg width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M21 16v-2l-8-5V3.5a1.5 1.5 0 0 0-3 0V9l-8 5v2l8-2.5V19l-2.5 1.5V22l4-1 4 1v-1.5L13 19v-5.5l8 2.5z" fill="#fff"/></svg>
+          OSO Tasks
+        </h1>
+        <p>Onsite Support Officer — บันทึกและติดตามงานประจำ</p>
+      </div>
+    </div>
+    <svg class="flight-path" viewBox="0 0 180 60">
+      <path d="M0 45 Q60 5 180 15" stroke="#fff" stroke-width="1.5" stroke-dasharray="4 5" fill="none"/>
+    </svg>
+  </div>
+
+  <div class="origin-warning" id="originWarning">
+    ⚠️ หน้านี้ถูกเปิดแบบไฟล์ (file://) ซึ่ง Google ไม่อนุญาตให้ทำการเชื่อมต่อ (OAuth) จากที่นี่ได้
+    กรุณาเปิดผ่านลิงก์ https:// ที่โฮสต์ไว้ (เช่น GitHub Pages) จึงจะเชื่อมต่อ Google Calendar ได้
+  </div>
+
+  <div class="status-bar">
+    <div class="status-pill" id="teamStatus">
+      <div class="dot"></div>
+      <span class="txt" id="teamStatusText">โหมดทำงานเดี่ยว (ข้อมูลอยู่ในเครื่องนี้)</span>
+      <button id="btnTeamConnect">เชื่อมต่อทีม</button>
+      <button class="secondary" id="btnTeamSettings" title="ตั้งค่า Firebase">⚙</button>
+    </div>
+    <div class="status-pill" id="gcalStatus">
+      <div class="dot"></div>
+      <span class="txt" id="gcalStatusText">ยังไม่เชื่อมต่อ Google Calendar</span>
+      <button id="btnGcalConnect">เชื่อมต่อ</button>
+      <button class="secondary" id="btnGcalSettings" title="ตั้งค่า Client ID">⚙</button>
+    </div>
+  </div>
+
+  <div class="toolbar">
+    <div class="search-box">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#8B8577" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      <input id="searchInput" type="text" placeholder="ค้นหาชื่องาน, รายละเอียด, หมายเหตุ...">
+    </div>
+    <button class="btn btn-primary" id="btnAddTask">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      เพิ่มงานใหม่
+    </button>
+  </div>
+
+  <div class="toolbar">
+    <button class="btn btn-ghost" id="btnManageProjects">จัดการ Project</button>
+    <button class="btn btn-ghost" id="btnManageResp">จัดการผู้รับผิดชอบ</button>
+    <button class="btn btn-ghost" id="btnHistory">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#437074" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>
+      ประวัติที่ลบ
+    </button>
+    <button class="btn btn-ghost" id="btnExportExcel">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#437074" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      ดาวน์โหลด Excel
+    </button>
+    <button class="btn btn-ghost" id="btnBackupExport">สำรองข้อมูล (JSON)</button>
+    <label class="btn btn-ghost" for="backupImportInput" style="margin:0;">นำเข้าข้อมูลสำรอง</label>
+    <input type="file" id="backupImportInput" accept="application/json" style="display:none;">
+  </div>
+
+  <div class="toolbar">
+    <span class="chips-label">Status</span>
+    <div class="chips" id="statusChips"></div>
+  </div>
+
+  <div class="groups-wrap" id="groupsWrap"></div>
+
+  <footer class="hint">
+    โหมดทำงานเดี่ยว: ข้อมูลเก็บใน localStorage ของเบราว์เซอร์นี้เท่านั้น &middot;
+    โหมดทีม: ข้อมูลอยู่บน Firebase แชร์เห็นตรงกันทุกอุปกรณ์แบบเรียลไทม์<br>
+    งานที่มีวันที่ครบกำหนดจะซิงก์ขึ้น Google Calendar เมื่อเชื่อมต่อบัญชีแล้ว
+  </footer>
+</div>
+
+<!-- Task Add/Edit Modal -->
+<div class="overlay" id="taskOverlay">
+  <div class="modal">
+    <h2 id="taskModalTitle">เพิ่มงานใหม่</h2>
+    <input type="hidden" id="taskId">
+    <div class="field-row">
+      <div class="field">
+        <label>Status</label>
+        <select id="f_status" class="status-select"></select>
+      </div>
+      <div class="field">
+        <label>Target Finished</label>
+        <input type="date" id="f_target">
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>ประเภท / Routine</label>
+        <input type="text" id="f_category" placeholder="เช่น ทุก 6 เดือน, ทุกครั้งที่มี New OSO">
+      </div>
+      <div class="field">
+        <label>Project / โครงการ (หมวดหมู่)</label>
+        <select id="f_project"></select>
+      </div>
+    </div>
+    <div class="field-row single">
+      <div class="field">
+        <label>Task Name — ชื่องาน</label>
+        <input type="text" id="f_taskname" placeholder="ชื่องาน">
+      </div>
+    </div>
+    <div class="field-row single">
+      <div class="field">
+        <label>Detail — รายละเอียดงาน</label>
+        <textarea id="f_detail" placeholder="รายละเอียดงาน..."></textarea>
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>Remark — หมายเหตุ</label>
+        <textarea id="f_remark" placeholder="หมายเหตุ..."></textarea>
+      </div>
+      <div class="field">
+        <label>Responsible — ผู้รับผิดชอบ</label>
+        <select id="f_responsible"></select>
+      </div>
+    </div>
+    <div class="field-check">
+      <input type="checkbox" id="f_syncCal" checked>
+      <label for="f_syncCal">ซิงก์งานนี้ขึ้น Google Calendar อัตโนมัติ (ต้องเชื่อมต่อบัญชีก่อน และมี Target Finished)</label>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelTask">ยกเลิก</button>
+      <button class="btn btn-primary" id="btnSaveTask">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Projects Modal -->
+<div class="overlay" id="projOverlay">
+  <div class="modal modal-sm">
+    <h2>จัดการ Project / หมวดหมู่</h2>
+    <div class="manage-list" id="projList"></div>
+    <div class="manage-add">
+      <input type="text" id="newProjInput" placeholder="เพิ่มชื่อ Project ใหม่...">
+      <button class="btn btn-primary btn-sm" id="btnAddProj">เพิ่ม</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCloseProj">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Responsible Modal -->
+<div class="overlay" id="respOverlay">
+  <div class="modal modal-sm">
+    <h2>จัดการผู้รับผิดชอบ</h2>
+    <div class="manage-list" id="respList"></div>
+    <div class="manage-add">
+      <input type="text" id="newRespInput" placeholder="เพิ่มชื่อผู้รับผิดชอบใหม่...">
+      <button class="btn btn-primary btn-sm" id="btnAddResp">เพิ่ม</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCloseResp">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Export Options Modal -->
+<div class="overlay" id="exportOverlay">
+  <div class="modal modal-sm">
+    <h2>เลือกรายงานที่ต้องการดาวน์โหลด</h2>
+    <p class="hint-text" style="margin-top:0;">งาน (Task)</p>
+    <div class="manage-add" style="margin-bottom:8px;">
+      <input type="text" id="exportTaskSearch" placeholder="ค้นหาชื่องานเพื่อเลือก...">
+    </div>
+    <div class="manage-add" style="margin-bottom:12px;">
+      <button class="btn btn-ghost btn-sm" id="btnExportTaskSelectAll">เลือกทั้งหมด</button>
+      <button class="btn btn-ghost btn-sm" id="btnExportTaskSelectNone">ไม่เลือกเลย</button>
+    </div>
+    <div class="manage-list" id="exportTaskList" style="max-height:220px;"></div>
+
+    <p class="hint-text">หัวข้อคอลัมน์ (Columns)</p>
+    <div class="manage-add" style="margin-bottom:12px;">
+      <button class="btn btn-ghost btn-sm" id="btnExportSelectAll">เลือกทั้งหมด</button>
+      <button class="btn btn-ghost btn-sm" id="btnExportSelectNone">ไม่เลือกเลย</button>
+    </div>
+    <div class="manage-list" id="exportColList"></div>
+    <p class="hint-text" style="margin-top:0;">รูปแบบไฟล์</p>
+    <div class="field-row single" style="margin-bottom:8px;">
+      <div class="field-check">
+        <input type="radio" name="exportFormat" id="exp_fmt_table" value="table" checked>
+        <label for="exp_fmt_table">ตาราง (1 แถวต่องาน)</label>
+      </div>
+      <div class="field-check">
+        <input type="radio" name="exportFormat" id="exp_fmt_report" value="report">
+        <label for="exp_fmt_report">รายงานแยกหัวข้อ (1 บล็อกต่องาน แบบตัวอย่าง)</label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCancelExport">ยกเลิก</button>
+      <button class="btn btn-primary" id="btnConfirmExport">ดาวน์โหลด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Deleted History Modal -->
+<div class="overlay" id="historyOverlay">
+  <div class="modal">
+    <h2>ประวัติงานที่ลบ</h2>
+    <p class="hint-text">งานที่ถูกลบจะเก็บไว้ที่นี่เพื่อดูย้อนหลัง สามารถกู้คืนกลับไปเป็นงานปกติ หรือลบถาวรออกจากประวัติได้</p>
+    <div class="manage-list" id="historyList" style="max-height:420px;"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCloseHistory">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Google Calendar Settings Modal -->
+<div class="overlay" id="gcalSettingsOverlay">
+  <div class="modal modal-sm">
+    <h2>ตั้งค่า Google Calendar</h2>
+    <p class="hint-text">
+      ใส่ <strong>OAuth Client ID</strong> ที่สร้างจาก Google Cloud Console (ประเภท "Web application")
+      โดยต้องเพิ่ม origin ของหน้านี้ (URL https:// ที่ใช้เปิดหน้านี้จริง) ไว้ใน "Authorized JavaScript origins"
+      ค่านี้จะถูกเก็บไว้ในเบราว์เซอร์นี้เท่านั้น หากใช้ร่วมกับทีม สมาชิกแต่ละคนต้องตั้งค่า Client ID เดียวกันในเบราว์เซอร์ของตัวเอง
+    </p>
+    <div class="field-row single">
+      <div class="field">
+        <label>OAuth Client ID</label>
+        <input type="text" id="gcalClientIdInput" placeholder="xxxxxxxx.apps.googleusercontent.com">
+      </div>
+    </div>
+    <div class="field-row single">
+      <div class="field">
+        <label>Calendar ID (เว้นว่าง = ปฏิทินหลักของบัญชีตัวเอง / ใส่ ID ปฏิทินทีมถ้ามี)</label>
+        <input type="text" id="gcalCalendarIdInput" placeholder="primary">
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCloseGcalSettings">ปิด</button>
+      <button class="btn btn-primary" id="btnSaveGcalSettings">บันทึก</button>
+    </div>
+  </div>
+</div>
+
+<!-- Team (Firebase) Settings Modal -->
+<div class="overlay" id="teamSettingsOverlay">
+  <div class="modal">
+    <h2>ตั้งค่าทีม (Firebase)</h2>
+    <p class="hint-text">
+      เชื่อมต่อ Firebase Realtime Database เพื่อให้ทุกคนในทีมเห็นและแก้ไขข้อมูลชุดเดียวกันแบบเรียลไทม์
+      คัดลอกค่าจาก Firebase Console → Project settings → General → Your apps → SDK setup and configuration
+      ทุกคนในทีมต้องใส่ค่าเดียวกันนี้ในเบราว์เซอร์ของตัวเอง แล้วกด "เชื่อมต่อทีม"
+    </p>
+    <div class="field-row single">
+      <div class="field"><label>apiKey</label><input type="text" id="fbApiKeyInput"></div>
+    </div>
+    <div class="field-row single">
+      <div class="field"><label>authDomain</label><input type="text" id="fbAuthDomainInput" placeholder="xxx.firebaseapp.com"></div>
+    </div>
+    <div class="field-row single">
+      <div class="field"><label>databaseURL</label><input type="text" id="fbDatabaseUrlInput" placeholder="https://xxx-default-rtdb.asia-southeast1.firebasedatabase.app"></div>
+    </div>
+    <div class="field-row">
+      <div class="field"><label>projectId</label><input type="text" id="fbProjectIdInput"></div>
+      <div class="field"><label>appId</label><input type="text" id="fbAppIdInput"></div>
+    </div>
+    <div class="modal-actions" style="justify-content:space-between;">
+      <button class="btn btn-ghost" id="btnMigrateToTeam">ย้ายข้อมูลจากเครื่องนี้ขึ้น Firebase</button>
+      <div style="display:flex; gap:10px;">
+        <button class="btn btn-ghost" id="btnCloseTeamSettings">ปิด</button>
+        <button class="btn btn-primary" id="btnSaveTeamSettings">บันทึก</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Confirm Modal -->
+<div class="overlay" id="confirmOverlay">
+  <div class="modal modal-sm">
+    <h2 id="confirmTitle">ยืนยันการลบ</h2>
+    <p class="confirm-text" id="confirmText">คุณต้องการลบรายการนี้หรือไม่?</p>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnConfirmCancel">ยกเลิก</button>
+      <button class="btn btn-danger" id="btnConfirmOk">ลบ</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const STATUS_DEFS = [
+  { key:'Inprogress',      label:'Inprogress',      bg:'var(--st-inprogress-bg)', fg:'var(--st-inprogress-fg)' },
+  { key:'Completed',       label:'Completed',       bg:'var(--st-completed-bg)',  fg:'var(--st-completed-fg)' },
+  { key:'Monthly',         label:'Monthly',         bg:'var(--st-monthly-bg)',    fg:'var(--st-monthly-fg)' },
+  { key:'Specific Period', label:'Specific Period', bg:'var(--st-specific-bg)',   fg:'var(--st-specific-fg)' },
+  { key:'Hold',            label:'Hold',            bg:'var(--st-hold-bg)',       fg:'var(--st-hold-fg)' },
+];
+const STORAGE_KEY = 'oso-tasks-state-v3';
+const GCAL_CONFIG_KEY = 'oso-tasks-gcal-config-v1';
+const GCAL_COLLAPSED_KEY = 'oso-tasks-collapsed-groups-v1';
+const GCAL_SCOPE = 'https://www.googleapis.com/auth/calendar.events';
+const FB_CONFIG_KEY = 'oso-tasks-firebase-config-v1';
+
+let state = null;
+let activeStatusFilter = 'ALL';
+let collapsedGroups = new Set();
+let teamMode = false;
+let fbRefs = {};
+
+/* ---------------- default / local persistence (works fully offline / file://) ---------------- */
+function defaultState(){
+  return {
+    nextId: 4,
+    projects: ['ALL Project','Thailand APPS and PNR','PIBICS','TDAC','PNG'],
+    responsibles: ['OSO Team','พิมพ์','เบส Consult'],
+    deletedTasks: [],
+    tasks: [
+      {
+        id:'1', status:'Completed', target:'', category:'',
+        project:'ALL Project', taskName:'ข้อสอบ OSO',
+        detail:'จัดทำข้อสอบสำหรับเจ้าหน้าที่ OSO ทั้งเก่าและใหม่',
+        remark:'- เบส Consult', responsible:'พิมพ์', googleEventId:null, syncCal:true
+      },
+      {
+        id:'2', status:'Completed', target:'', category:'ทุก ๆ ครั้งที่จะมี New OSO',
+        project:'ALL Project', taskName:'การทดสอบ New OSO',
+        detail:'**การจัดคนเข้าปฏิบัติงานเป็น Onsite Support Officer (OSO) ที่ห้อง CCOC ทำอากาศยานสุวรรณภูมิ มีขั้นตอนดังนี้** :note:\n1. หัวหน้างานแต่ละทีมประเมินเสนอชื่อพนักงานที่จะเข้ารับการประเมินการจัดตารางเข้า OSO และจัดประเมินภายในทีม (ใช้ Form การประเมินจากทีม OSO)\n2. หลังจากมีการประเมินจากแต่ละทีมแล้ว Senior OSO ชี้แจงผลการประเมิน "ผ่าน" :check: หรือ "ไม่ผ่าน" :cross_mark:\n3. Senior OSO จัดสอบวัดข้อมูลพื้นฐาน โดยแจ้งวันและเวลาที่จะจัดสอบ ห้องสอบ หัวข้อที่จะจัดสอบ เพื่อให้พนักงานเตรียมตัวล่วงหน้า\n4. Senior OSO แจ้งผลการสอบกับพนักงานทันที หากสอบไม่ผ่าน ให้สอบอีกครั้ง หากสอบทั้ง 2 รอบแล้วยังไม่ผ่าน ให้รออีก 6 เดือน แล้วหัวหน้างานแต่ละทีมประเมินใหม่อีกครั้ง\n5. กรณีสอบผ่าน จะมีการจัดตารางเข้าอบรมการปฏิบัติงาน OSO (8 ชม.) จำนวน 2 วัน และจัดตารางเข้า OSO (12 ชม.) ในลำดับถัดไป',
+        remark:'21/11/2025 วรรณศิลป์ ผ่าน\n08/01/2026 ปวริศ = ผ่าน', responsible:'OSO Team', googleEventId:null, syncCal:true
+      },
+      {
+        id:'3', status:'Specific Period', target:'2026-01-01', category:'ทุก 6 เดือน',
+        project:'ALL Project', taskName:'การอบรมทวนหน้าที่ OSO / Recurrent for OSO (ทุก 6 เดือน)',
+        detail:'การอบรมทวนหน้าที่ OSO / Recurrent การปฏิบัติงาน Onsite Support\n1. ทบทวนด้วยสไลด์อบรมพนักงาน OSO\n2. ให้ทำข้อสอบ OSO ผ่านเกณฑ์การให้คะแนน (พีแนนกำหนดให้ 90%)\n3. รีวิวข้อสอบทุกครั้งก่อนจัดสอบ\n4. ใช้เวลาไม่เกินครึ่งวัน\n5. กรณีไม่ผ่านการทดสอบ จะให้ทดสอบอีกครั้ง\n6. หากยังไม่ผ่านอีก จะให้ลดการเข้ากะที่ % ..... หรือกรณีต่ำกว่า ... % ไม่จัดให้เข้ากะ (Case by Case - Senior พิจารณา)\n----------------\n*อยู่ระหว่างคุณพิมพ์มาตาคัดคำถาม แบ่งเป็นจำนวนดังนี้*\nAPPS & PNR = 20 ข้อ\nPIBICS = 10 ข้อ\nTDAC = 10 ข้อ\n\nรอบที่ 1 - รอดูตารางงานเดือน2-3/2026\nรอบที่ 2 - รอดูตารางงานเดือนกรกฏาคม 2026\n\n22/2/2026 ขอเวลาไม่เกิน 1 ชั่วโมง',
+        remark:'- ทบทวนในวันที่ประชุม OSO เดือนมกราคม 2569\n- สอบ OSO เดือนกุมภาพันธ์ 2569 ผ่าน Google form อยู่ระหว่างจัดทำ\n- พีแนน Thai APPS & PNR\n- เบส PIBICS + TDAC\n- อยู่ระหว่างคุณพิมพ์มาดาคัดคำถามเพื่อนำลง GG Form',
+        responsible:'OSO Team', googleEventId:null, syncCal:true
+      }
+    ]
+  };
+}
+
+async function loadState(){
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(raw){
+      state = JSON.parse(raw);
+      if(!Array.isArray(state.deletedTasks)) state.deletedTasks = [];
+      return;
+    }
+  }catch(e){ /* corrupted -> fall through to default */ }
+  state = defaultState();
+  await saveState();
+}
+
+async function saveState(){
+  if(teamMode) return; // Firebase listeners keep `state` in sync; nothing to persist locally
+  try{
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  }catch(e){
+    console.error('Storage save failed', e);
+  }
+}
+
+function loadCollapsedGroups(){
+  try{
+    const raw = localStorage.getItem(GCAL_COLLAPSED_KEY);
+    if(raw) collapsedGroups = new Set(JSON.parse(raw));
+  }catch(e){ collapsedGroups = new Set(); }
+}
+function saveCollapsedGroups(){
+  try{ localStorage.setItem(GCAL_COLLAPSED_KEY, JSON.stringify([...collapsedGroups])); }catch(e){}
+}
+
+function escapeHtml(str){
+  if(str === undefined || str === null) return '';
+  return String(str).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function todayISO(){
+  return new Date().toISOString().slice(0,10);
+}
+
+function formatThaiDate(iso){
+  if(!iso) return '<span class="muted-dash">—</span>';
+  try{
+    const d = new Date(iso + 'T00:00:00');
+    const fmt = new Intl.DateTimeFormat('th-TH-u-ca-buddhist', { day:'numeric', month:'short', year:'numeric' });
+    return fmt.format(d);
+  }catch(e){ return escapeHtml(iso); }
+}
+
+function statusDef(key){
+  return STATUS_DEFS.find(s=>s.key===key) || STATUS_DEFS[0];
+}
+
+function renderStatusChips(){
+  const el = document.getElementById('statusChips');
+  const chips = [{key:'ALL', label:'ทั้งหมด'}, ...STATUS_DEFS];
+  el.innerHTML = chips.map(c=>{
+    const active = activeStatusFilter === c.key ? 'active' : '';
+    return `<div class="chip ${active}" data-status="${escapeHtml(c.key)}">${escapeHtml(c.label)}</div>`;
+  }).join('');
+  el.querySelectorAll('.chip').forEach(chip=>{
+    chip.addEventListener('click', ()=>{
+      activeStatusFilter = chip.getAttribute('data-status');
+      renderStatusChips();
+      renderTable();
+    });
+  });
+}
+
+/* ---------------- Grouped table (by Project) ---------------- */
+function renderTable(){
+  const wrap = document.getElementById('groupsWrap');
+  const search = document.getElementById('searchInput').value.trim().toLowerCase();
+
+  let rows = state.tasks.filter(t=>{
+    if(activeStatusFilter !== 'ALL' && t.status !== activeStatusFilter) return false;
+    if(search){
+      const hay = [t.taskName, t.detail, t.remark, t.category, t.project, t.responsible].join(' ').toLowerCase();
+      if(!hay.includes(search)) return false;
+    }
+    return true;
+  });
+
+  if(rows.length === 0){
+    wrap.innerHTML = `<div class="group-card"><table><tbody>
+      <tr class="empty-row"><td>ไม่พบงานที่ตรงกับเงื่อนไข ลองเปลี่ยนตัวกรองหรือเพิ่มงานใหม่</td></tr>
+    </tbody></table></div>`;
+    return;
+  }
+
+  const groups = new Map();
+  state.projects.forEach(p=>groups.set(p, []));
+  rows.forEach(t=>{
+    const key = t.project || 'ไม่ระบุ Project';
+    if(!groups.has(key)) groups.set(key, []);
+    groups.get(key).push(t);
+  });
+
+  let html = '';
+  for(const [projectName, list] of groups.entries()){
+    if(list.length === 0) continue;
+    const collapsed = collapsedGroups.has(projectName) ? 'collapsed' : '';
+    html += `
+    <div class="group-card ${collapsed}" data-group="${escapeHtml(projectName)}">
+      <div class="group-head" onclick="toggleGroup('${escapeHtml(projectName).replace(/'/g,"\\'")}')">
+        <div class="gh-left">
+          <svg class="caret" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"/></svg>
+          <h3>${escapeHtml(projectName)}</h3>
+        </div>
+        <span class="group-count">${list.length} งาน</span>
+      </div>
+      <div class="group-body">
+        <table>
+          <thead>
+            <tr>
+              <th>Status</th>
+              <th>Target Finished</th>
+              <th>ประเภท / Routine</th>
+              <th>Task Name — ชื่องาน</th>
+              <th>Detail — รายละเอียดงาน</th>
+              <th>Remark — หมายเหตุ</th>
+              <th>Responsible — ผู้รับผิดชอบ</th>
+              <th style="text-align:center;">จัดการ</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${list.map(rowHtml).join('')}
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }
+  wrap.innerHTML = html;
+}
+
+function rowHtml(t){
+  const sd = statusDef(t.status);
+  const calBadge = t.googleEventId ? `<div class="pill-cal">🗓 ซิงก์แล้ว</div>` : '';
+  const isOverdue = !!t.target && t.target < todayISO() && t.status !== 'Completed' && t.status !== 'Hold';
+  const overdueBadge = isOverdue ? `<span class="pill-overdue">⚠ เลยกำหนด</span>` : '';
+  return `
+    <tr>
+      <td><span class="pill" style="background:${sd.bg};color:${sd.fg}">${escapeHtml(sd.label)}</span></td>
+      <td>${formatThaiDate(t.target)}${overdueBadge}${calBadge}</td>
+      <td>${t.category ? escapeHtml(t.category) : '<span class="muted-dash">—</span>'}</td>
+      <td><strong>${escapeHtml(t.taskName)}</strong></td>
+      <td class="cell-detail">${escapeHtml(t.detail) || '<span class="muted-dash">—</span>'}</td>
+      <td class="cell-remark">${escapeHtml(t.remark) || '<span class="muted-dash">—</span>'}</td>
+      <td><span class="pill pill-responsible">${escapeHtml(t.responsible || '—')}</span></td>
+      <td>
+        <div class="row-actions">
+          <button class="icon-btn" title="แก้ไข" onclick="openTaskModal('${t.id}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          </button>
+          <button class="icon-btn danger" title="ลบ" onclick="deleteTask('${t.id}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+          </button>
+        </div>
+      </td>
+    </tr>`;
+}
+
+function toggleGroup(projectName){
+  if(collapsedGroups.has(projectName)) collapsedGroups.delete(projectName);
+  else collapsedGroups.add(projectName);
+  saveCollapsedGroups();
+  renderTable();
+}
+
+/* ---------------- Task Modal ---------------- */
+function populateSelectOptions(){
+  const statusSel = document.getElementById('f_status');
+  statusSel.innerHTML = STATUS_DEFS.map(s=>`<option value="${escapeHtml(s.key)}">${escapeHtml(s.label)}</option>`).join('');
+
+  const projSel = document.getElementById('f_project');
+  projSel.innerHTML = state.projects.map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
+
+  const respSel = document.getElementById('f_responsible');
+  respSel.innerHTML = state.responsibles.map(r=>`<option value="${escapeHtml(r)}">${escapeHtml(r)}</option>`).join('');
+}
+
+function openTaskModal(id){
+  populateSelectOptions();
+  const overlay = document.getElementById('taskOverlay');
+  const title = document.getElementById('taskModalTitle');
+
+  if(id){
+    const t = state.tasks.find(x=>x.id===id);
+    if(!t) return;
+    title.textContent = 'แก้ไขงาน';
+    document.getElementById('taskId').value = t.id;
+    document.getElementById('f_status').value = t.status;
+    document.getElementById('f_target').value = t.target || '';
+    document.getElementById('f_category').value = t.category || '';
+    document.getElementById('f_project').value = t.project || state.projects[0];
+    document.getElementById('f_taskname').value = t.taskName || '';
+    document.getElementById('f_detail').value = t.detail || '';
+    document.getElementById('f_remark').value = t.remark || '';
+    document.getElementById('f_responsible').value = t.responsible || state.responsibles[0];
+    document.getElementById('f_syncCal').checked = t.syncCal !== false;
+  }else{
+    title.textContent = 'เพิ่มงานใหม่';
+    document.getElementById('taskId').value = '';
+    document.getElementById('f_status').value = 'Inprogress';
+    document.getElementById('f_target').value = '';
+    document.getElementById('f_category').value = '';
+    document.getElementById('f_project').value = state.projects[0] || '';
+    document.getElementById('f_taskname').value = '';
+    document.getElementById('f_detail').value = '';
+    document.getElementById('f_remark').value = '';
+    document.getElementById('f_responsible').value = state.responsibles[0] || '';
+    document.getElementById('f_syncCal').checked = true;
+  }
+  overlay.classList.add('show');
+}
+
+function closeTaskModal(){
+  document.getElementById('taskOverlay').classList.remove('show');
+}
+
+function fbdb(){ return firebase.database(); }
+
+/* ---------------- persistence layer: local (single device) or team (Firebase realtime) ---------------- */
+async function persistNewTask(payload){
+  if(teamMode){
+    const ref = fbdb().ref('tasks').push();
+    payload.id = ref.key;
+    state.tasks.push(payload);
+    renderTable();
+    await ref.set(payload);
+  }else{
+    payload.id = String(state.nextId++);
+    state.tasks.push(payload);
+    await saveState();
+    renderTable();
+  }
+  return payload;
+}
+
+async function persistUpdateTask(id, payload){
+  const t = state.tasks.find(x=>x.id===id);
+  if(t) Object.assign(t, payload);
+  renderTable();
+  if(teamMode){
+    await fbdb().ref('tasks/'+id).update(payload);
+  }else{
+    await saveState();
+  }
+  return t;
+}
+
+async function persistDeleteTask(task){
+  state.tasks = state.tasks.filter(x=>x.id!==task.id);
+  const archived = Object.assign({}, task, { googleEventId:null, deletedAt:new Date().toISOString() });
+  if(teamMode){
+    const ref = fbdb().ref('deletedTasks').push();
+    archived.id = ref.key;
+    state.deletedTasks.unshift(archived);
+    renderTable();
+    await fbdb().ref('tasks/'+task.id).remove();
+    await ref.set(archived);
+  }else{
+    state.deletedTasks.unshift(archived);
+    await saveState();
+    renderTable();
+  }
+}
+
+async function persistRestoreTask(archivedTask){
+  state.deletedTasks = state.deletedTasks.filter(x=>x.id!==archivedTask.id);
+  const restored = Object.assign({}, archivedTask);
+  delete restored.deletedAt;
+  if(teamMode){
+    const ref = fbdb().ref('tasks').push();
+    restored.id = ref.key;
+    state.tasks.push(restored);
+    renderTable(); renderHistoryList();
+    await fbdb().ref('deletedTasks/'+archivedTask.id).remove();
+    await ref.set(restored);
+  }else{
+    state.tasks.push(restored);
+    await saveState();
+    renderTable(); renderHistoryList();
+  }
+  return restored;
+}
+
+async function persistPermanentDelete(id){
+  state.deletedTasks = state.deletedTasks.filter(x=>x.id!==id);
+  renderHistoryList();
+  if(teamMode){
+    await fbdb().ref('deletedTasks/'+id).remove();
+  }else{
+    await saveState();
+  }
+}
+
+async function persistProjects(newArr){
+  state.projects = newArr;
+  if(teamMode){
+    await fbdb().ref('projects').set(newArr);
+  }else{
+    await saveState();
+  }
+}
+
+async function persistResponsibles(newArr){
+  state.responsibles = newArr;
+  if(teamMode){
+    await fbdb().ref('responsibles').set(newArr);
+  }else{
+    await saveState();
+  }
+}
+
+async function saveTaskFromModal(){
+  const taskName = document.getElementById('f_taskname').value.trim();
+  if(!taskName){
+    alert('กรุณากรอกชื่องาน (Task Name)');
+    return;
+  }
+  const idVal = document.getElementById('taskId').value;
+  const payload = {
+    status: document.getElementById('f_status').value,
+    target: document.getElementById('f_target').value,
+    category: document.getElementById('f_category').value.trim(),
+    project: document.getElementById('f_project').value,
+    taskName: taskName,
+    detail: document.getElementById('f_detail').value,
+    remark: document.getElementById('f_remark').value,
+    responsible: document.getElementById('f_responsible').value,
+    syncCal: document.getElementById('f_syncCal').checked,
+  };
+
+  let task;
+  if(idVal){
+    task = await persistUpdateTask(idVal, payload);
+  }else{
+    payload.googleEventId = null;
+    task = await persistNewTask(payload);
+  }
+  closeTaskModal();
+
+  if(task) syncTaskToCalendar(task).then(renderTable);
+}
+
+function deleteTask(id){
+  const t = state.tasks.find(x=>x.id===id);
+  showConfirm('ยืนยันการลบงาน', 'ต้องการลบงานนี้ออกจากรายการหรือไม่? งานจะถูกย้ายไปเก็บไว้ใน "ประวัติที่ลบ" สามารถกู้คืนได้ภายหลัง', async ()=>{
+    if(t) await deleteTaskCalendarEvent(t);
+    if(t) await persistDeleteTask(t);
+  });
+}
+
+/* ---------------- Deleted history ---------------- */
+function renderHistoryList(){
+  const el = document.getElementById('historyList');
+  if(!state.deletedTasks || state.deletedTasks.length === 0){
+    el.innerHTML = `<div class="confirm-text" style="text-align:center;color:var(--muted);">ยังไม่มีงานที่ถูกลบ</div>`;
+    return;
+  }
+  el.innerHTML = state.deletedTasks.map(t=>{
+    const sd = statusDef(t.status);
+    const when = t.deletedAt ? new Date(t.deletedAt).toLocaleString('th-TH') : '';
+    return `
+    <div class="manage-item" style="align-items:flex-start; flex-direction:column; gap:8px; padding:12px;">
+      <div style="display:flex; justify-content:space-between; width:100%; gap:8px; flex-wrap:wrap;">
+        <div>
+          <span class="pill" style="background:${sd.bg};color:${sd.fg}">${escapeHtml(sd.label)}</span>
+          <strong style="margin-left:8px;">${escapeHtml(t.taskName)}</strong>
+        </div>
+        <span style="font-size:12px;color:var(--muted);">ลบเมื่อ ${escapeHtml(when)}</span>
+      </div>
+      <div style="font-size:12.5px;color:var(--muted);">
+        Project: ${escapeHtml(t.project || '—')} · ผู้รับผิดชอบ: ${escapeHtml(t.responsible || '—')}
+      </div>
+      <div style="display:flex; gap:8px;">
+        <button class="btn btn-ghost btn-sm" onclick="restoreTask('${t.id}')">กู้คืน</button>
+        <button class="btn btn-danger btn-sm" onclick="permanentlyDeleteTask('${t.id}')">ลบถาวร</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function restoreTask(id){
+  const t = state.deletedTasks.find(x=>x.id===id);
+  if(!t) return;
+  const restored = await persistRestoreTask(t);
+  if(restored.syncCal !== false) syncTaskToCalendar(restored).then(renderTable);
+}
+
+function permanentlyDeleteTask(id){
+  showConfirm('ลบถาวร', 'ต้องการลบงานนี้ออกจากประวัติถาวรหรือไม่? จะไม่สามารถกู้คืนได้อีก', async ()=>{
+    await persistPermanentDelete(id);
+  });
+}
+
+/* ---------------- Manage Projects ---------------- */
+function renderProjList(){
+  const el = document.getElementById('projList');
+  el.innerHTML = state.projects.map((p,i)=>`
+    <div class="manage-item">
+      <input type="text" value="${escapeHtml(p)}" data-idx="${i}" class="proj-input">
+      <button class="icon-btn danger" title="ลบ" onclick="deleteProject(${i})">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button>
+    </div>`).join('');
+  el.querySelectorAll('.proj-input').forEach(input=>{
+    input.addEventListener('change', async (e)=>{
+      const idx = parseInt(e.target.getAttribute('data-idx'),10);
+      const oldVal = state.projects[idx];
+      const newVal = e.target.value.trim();
+      if(!newVal){ e.target.value = oldVal; return; }
+      const newArr = state.projects.slice();
+      newArr[idx] = newVal;
+      state.tasks.forEach(t=>{ if(t.project === oldVal) t.project = newVal; });
+      await persistProjects(newArr);
+      renderTable();
+    });
+  });
+}
+
+function deleteProject(idx){
+  const name = state.projects[idx];
+  showConfirm('ลบ Project', `ต้องการลบ "${escapeHtml(name)}" หรือไม่? งานที่ใช้ Project นี้จะยังเก็บชื่อเดิมไว้`, async ()=>{
+    const newArr = state.projects.slice();
+    newArr.splice(idx,1);
+    await persistProjects(newArr);
+    renderProjList();
+    renderTable();
+  });
+}
+
+async function addProject(){
+  const input = document.getElementById('newProjInput');
+  const val = input.value.trim();
+  if(!val) return;
+  if(state.projects.includes(val)){ input.value=''; return; }
+  const newArr = state.projects.slice();
+  newArr.push(val);
+  input.value = '';
+  await persistProjects(newArr);
+  renderProjList();
+  renderTable();
+}
+
+/* ---------------- Manage Responsible ---------------- */
+function renderRespList(){
+  const el = document.getElementById('respList');
+  el.innerHTML = state.responsibles.map((r,i)=>`
+    <div class="manage-item">
+      <input type="text" value="${escapeHtml(r)}" data-idx="${i}" class="resp-input">
+      <button class="icon-btn danger" title="ลบ" onclick="deleteResp(${i})">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button>
+    </div>`).join('');
+  el.querySelectorAll('.resp-input').forEach(input=>{
+    input.addEventListener('change', async (e)=>{
+      const idx = parseInt(e.target.getAttribute('data-idx'),10);
+      const oldVal = state.responsibles[idx];
+      const newVal = e.target.value.trim();
+      if(!newVal){ e.target.value = oldVal; return; }
+      const newArr = state.responsibles.slice();
+      newArr[idx] = newVal;
+      state.tasks.forEach(t=>{ if(t.responsible === oldVal) t.responsible = newVal; });
+      await persistResponsibles(newArr);
+      renderTable();
+    });
+  });
+}
+
+function deleteResp(idx){
+  const name = state.responsibles[idx];
+  showConfirm('ลบผู้รับผิดชอบ', `ต้องการลบ "${escapeHtml(name)}" หรือไม่? งานที่ใช้ชื่อนี้จะยังเก็บชื่อเดิมไว้`, async ()=>{
+    const newArr = state.responsibles.slice();
+    newArr.splice(idx,1);
+    await persistResponsibles(newArr);
+    renderRespList();
+    renderTable();
+  });
+}
+
+async function addResp(){
+  const input = document.getElementById('newRespInput');
+  const val = input.value.trim();
+  if(!val) return;
+  if(state.responsibles.includes(val)){ input.value=''; return; }
+  const newArr = state.responsibles.slice();
+  newArr.push(val);
+  input.value = '';
+  await persistResponsibles(newArr);
+  renderRespList();
+}
+
+/* ---------------- Export to Excel ---------------- */
+const EXPORT_COLUMNS = [
+  { key:'status',      label:'Status' },
+  { key:'target',      label:'Target Finished' },
+  { key:'category',    label:'ประเภท / Routine' },
+  { key:'project',     label:'Project / โครงการ' },
+  { key:'taskName',    label:'Task Name - ชื่องาน' },
+  { key:'detail',      label:'Detail - รายละเอียดงาน' },
+  { key:'remark',      label:'Remark - หมายเหตุ' },
+  { key:'responsible', label:'Responsible - ผู้รับผิดชอบ' },
+];
+const COL_WIDTHS = { status:16, target:14, category:22, project:20, taskName:30, detail:60, remark:40, responsible:20 };
+
+let exportSelectedTaskIds = new Set();
+
+function renderExportTaskList(filterText){
+  const el = document.getElementById('exportTaskList');
+  const search = (filterText || '').trim().toLowerCase();
+  const list = state.tasks.filter(t=>!search || t.taskName.toLowerCase().includes(search));
+  if(list.length === 0){
+    el.innerHTML = `<div class="confirm-text" style="text-align:center;color:var(--muted);margin:0;">ไม่พบงานที่ตรงกับคำค้นหา</div>`;
+    return;
+  }
+  el.innerHTML = list.map(t=>{
+    const checked = exportSelectedTaskIds.has(t.id) ? 'checked' : '';
+    return `
+    <div class="export-item">
+      <input type="checkbox" class="exp-task-cb" data-id="${t.id}" ${checked}>
+      <label>${escapeHtml(t.taskName)} <span style="color:var(--muted);font-size:12px;">(${escapeHtml(t.project || '—')})</span></label>
+    </div>`;
+  }).join('');
+  el.querySelectorAll('.exp-task-cb').forEach(cb=>{
+    cb.addEventListener('change', (e)=>{
+      const id = e.target.getAttribute('data-id');
+      if(e.target.checked) exportSelectedTaskIds.add(id);
+      else exportSelectedTaskIds.delete(id);
+    });
+  });
+}
+
+function openExportModal(){
+  exportSelectedTaskIds = new Set(state.tasks.map(t=>t.id));
+  document.getElementById('exportTaskSearch').value = '';
+  renderExportTaskList('');
+
+  const el = document.getElementById('exportColList');
+  el.innerHTML = EXPORT_COLUMNS.map(c=>`
+    <div class="export-item">
+      <input type="checkbox" id="exp_${c.key}" checked>
+      <label for="exp_${c.key}">${escapeHtml(c.label)}</label>
+    </div>`).join('');
+  document.getElementById('exportOverlay').classList.add('show');
+}
+function closeExportModal(){
+  document.getElementById('exportOverlay').classList.remove('show');
+}
+
+const REPORT_LABELS = {
+  status:'สถานะ (Status)',
+  target:'กำหนดเสร็จ (Target Finished)',
+  category:'ประเภท / Routine',
+  project:'โครงการ (Project)',
+  taskName:'หัวข้อรายงาน (Task Name)',
+  detail:'เนื้อหารายงาน (Detail)',
+  remark:'หมายเหตุ (Remark)',
+  responsible:'ผู้รับผิดชอบ (Responsible)',
+};
+
+function exportToExcel(){
+  const selectedCols = EXPORT_COLUMNS.filter(c=>document.getElementById(`exp_${c.key}`).checked);
+  if(selectedCols.length === 0){
+    alert('กรุณาเลือกหัวข้อที่ต้องการดาวน์โหลดอย่างน้อย 1 หัวข้อ');
+    return;
+  }
+  const selectedTasks = state.tasks.filter(t=>exportSelectedTaskIds.has(t.id));
+  if(selectedTasks.length === 0){
+    alert('กรุณาเลือกงานที่ต้องการดาวน์โหลดอย่างน้อย 1 งาน');
+    return;
+  }
+  if(typeof XLSX === 'undefined'){
+    alert('ไม่สามารถโหลดไลบรารีสำหรับสร้างไฟล์ Excel ได้ กรุณาตรวจสอบการเชื่อมต่ออินเทอร์เน็ตแล้วลองใหม่');
+    return;
+  }
+  const format = document.querySelector('input[name="exportFormat"]:checked').value;
+  const wb = XLSX.utils.book_new();
+
+  if(format === 'report'){
+    const ws = buildReportSheet(selectedCols, selectedTasks);
+    XLSX.utils.book_append_sheet(wb, ws, 'OSO Report');
+  }else{
+    const header = selectedCols.map(c=>c.label);
+    const rows = selectedTasks.map(t=>selectedCols.map(c=>{
+      if(c.key === 'status') return statusDef(t.status).label;
+      return t[c.key] || '';
+    }));
+    const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
+    ws['!cols'] = selectedCols.map(c=>({ wch: COL_WIDTHS[c.key] || 20 }));
+    XLSX.utils.book_append_sheet(wb, ws, 'OSO Tasks');
+  }
+
+  XLSX.writeFile(wb, `OSO_Tasks_export.xlsx`);
+  closeExportModal();
+}
+
+function buildReportSheet(selectedCols, tasks){
+  const aoa = [];
+  const merges = [];
+
+  tasks.forEach((t)=>{
+    const titleRow = aoa.length;
+    aoa.push([`OSO Work Update Report — ${t.taskName || ''}`, '']);
+    merges.push({ s:{r:titleRow, c:0}, e:{r:titleRow, c:1} });
+
+    selectedCols.forEach(c=>{
+      const label = REPORT_LABELS[c.key] || c.label;
+      let value = t[c.key] || '';
+      if(c.key === 'status') value = statusDef(t.status).label;
+      if(c.key === 'target') value = t.target ? formatThaiDatePlain(t.target) : '';
+      aoa.push([label, value]);
+    });
+
+    aoa.push(['', '']); // spacer row between task blocks
+  });
+
+  if(aoa.length === 0) aoa.push(['ไม่มีข้อมูล', '']);
+
+  const ws = XLSX.utils.aoa_to_sheet(aoa);
+  ws['!merges'] = merges;
+  ws['!cols'] = [{ wch: 26 }, { wch: 90 }];
+  return ws;
+}
+
+function formatThaiDatePlain(iso){
+  try{
+    const d = new Date(iso + 'T00:00:00');
+    return new Intl.DateTimeFormat('th-TH-u-ca-buddhist', { day:'numeric', month:'short', year:'numeric' }).format(d);
+  }catch(e){ return iso; }
+}
+
+/* ---------------- JSON backup export / import ---------------- */
+function exportBackupJson(){
+  const data = JSON.stringify(state, null, 2);
+  const blob = new Blob([data], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `OSO_Tasks_backup.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+function importBackupJson(file){
+  const reader = new FileReader();
+  reader.onload = (e)=>{
+    let data;
+    try{
+      data = JSON.parse(e.target.result);
+    }catch(err){
+      alert('ไฟล์ไม่ถูกต้อง: ' + err.message);
+      return;
+    }
+    showConfirm('นำเข้าข้อมูลสำรอง', 'การนำเข้าจะแทนที่ข้อมูลปัจจุบันทั้งหมด (ในโหมดที่ใช้งานอยู่ตอนนี้) ต้องการดำเนินการต่อหรือไม่?', async ()=>{
+      if(teamMode){
+        const d = fbdb();
+        await d.ref('projects').set(data.projects || []);
+        await d.ref('responsibles').set(data.responsibles || []);
+        const tasksObj = {};
+        (data.tasks || []).forEach(t=>{
+          const copy = Object.assign({}, t);
+          const id = copy.id || d.ref('tasks').push().key;
+          delete copy.id;
+          tasksObj[id] = copy;
+        });
+        await d.ref('tasks').set(tasksObj);
+        const delObj = {};
+        (data.deletedTasks || []).forEach(t=>{
+          const copy = Object.assign({}, t);
+          const id = copy.id || d.ref('deletedTasks').push().key;
+          delete copy.id;
+          delObj[id] = copy;
+        });
+        await d.ref('deletedTasks').set(delObj);
+      }else{
+        state = data;
+        if(!Array.isArray(state.projects)) state.projects = defaultState().projects;
+        if(!Array.isArray(state.responsibles)) state.responsibles = defaultState().responsibles;
+        if(!Array.isArray(state.tasks)) state.tasks = [];
+        if(!Array.isArray(state.deletedTasks)) state.deletedTasks = [];
+        const maxId = state.tasks.reduce((m,t)=>Math.max(m, parseInt(t.id,10) || 0), 0);
+        state.nextId = maxId + 1;
+        await saveState();
+        renderTable();
+      }
+    });
+  };
+  reader.readAsText(file);
+}
+
+/* ---------------- Confirm Modal ---------------- */
+let confirmCallback = null;
+function showConfirm(title, text, onOk){
+  document.getElementById('confirmTitle').textContent = title;
+  document.getElementById('confirmText').textContent = text;
+  confirmCallback = onOk;
+  document.getElementById('confirmOverlay').classList.add('show');
+}
+function closeConfirm(){
+  document.getElementById('confirmOverlay').classList.remove('show');
+  confirmCallback = null;
+}
+
+/* ---------------- Team mode (Firebase Realtime Database) ---------------- */
+let firebaseConfig = { apiKey:'', authDomain:'', databaseURL:'', projectId:'', appId:'' };
+
+function loadFirebaseConfig(){
+  try{
+    const raw = localStorage.getItem(FB_CONFIG_KEY);
+    if(raw) firebaseConfig = Object.assign(firebaseConfig, JSON.parse(raw));
+  }catch(e){}
+}
+function saveFirebaseConfig(){
+  try{ localStorage.setItem(FB_CONFIG_KEY, JSON.stringify(firebaseConfig)); }catch(e){}
+}
+
+function updateTeamStatusUI(){
+  const box = document.getElementById('teamStatus');
+  const txt = document.getElementById('teamStatusText');
+  const btn = document.getElementById('btnTeamConnect');
+  if(teamMode){
+    box.classList.add('connected');
+    txt.textContent = 'โหมดทีม (Firebase) — เชื่อมต่อแล้ว';
+    btn.textContent = 'ตัดการเชื่อมต่อ';
+  }else{
+    box.classList.remove('connected');
+    txt.textContent = 'โหมดทำงานเดี่ยว (ข้อมูลอยู่ในเครื่องนี้)';
+    btn.textContent = 'เชื่อมต่อทีม';
+  }
+}
+
+function attachFirebaseListeners(){
+  const d = fbdb();
+  fbRefs.projects = d.ref('projects');
+  fbRefs.projects.on('value', snap=>{
+    const val = snap.val();
+    state.projects = (Array.isArray(val) && val.length) ? val : defaultState().projects;
+    renderTable();
+  });
+  fbRefs.responsibles = d.ref('responsibles');
+  fbRefs.responsibles.on('value', snap=>{
+    const val = snap.val();
+    state.responsibles = (Array.isArray(val) && val.length) ? val : defaultState().responsibles;
+  });
+  fbRefs.tasks = d.ref('tasks');
+  fbRefs.tasks.on('value', snap=>{
+    const val = snap.val() || {};
+    state.tasks = Object.keys(val).map(id=>Object.assign({id}, val[id]));
+    renderTable();
+  });
+  fbRefs.deletedTasks = d.ref('deletedTasks');
+  fbRefs.deletedTasks.on('value', snap=>{
+    const val = snap.val() || {};
+    state.deletedTasks = Object.keys(val).map(id=>Object.assign({id}, val[id]))
+      .sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||''));
+    renderHistoryList();
+  });
+}
+
+function detachFirebaseListeners(){
+  Object.values(fbRefs).forEach(r=>{ if(r) r.off(); });
+  fbRefs = {};
+}
+
+async function connectTeamMode(){
+  if(teamMode){
+    detachFirebaseListeners();
+    teamMode = false;
+    updateTeamStatusUI();
+    await loadState();
+    renderTable();
+    return;
+  }
+  if(!firebaseConfig.apiKey || !firebaseConfig.databaseURL || !firebaseConfig.projectId){
+    document.getElementById('teamSettingsOverlay').classList.add('show');
+    return;
+  }
+  try{
+    if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    await firebase.auth().signInAnonymously();
+    attachFirebaseListeners();
+    teamMode = true;
+    updateTeamStatusUI();
+  }catch(e){
+    console.error('Firebase connect failed', e);
+    alert('เชื่อมต่อทีมไม่สำเร็จ: ' + e.message);
+  }
+}
+
+async function migrateLocalDataToFirebase(){
+  if(!teamMode){
+    alert('กรุณากด "เชื่อมต่อทีม" ให้สำเร็จก่อน แล้วค่อยกดย้ายข้อมูล');
+    return;
+  }
+  let local;
+  try{
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if(!raw){ alert('ไม่พบข้อมูลที่เคยบันทึกไว้ในเครื่องนี้'); return; }
+    local = JSON.parse(raw);
+  }catch(e){ alert('อ่านข้อมูลในเครื่องนี้ไม่สำเร็จ'); return; }
+
+  showConfirm(
+    'ย้ายข้อมูลขึ้น Firebase',
+    `จะนำงาน ${((local.tasks)||[]).length} รายการจากเครื่องนี้ขึ้นไปรวมกับฐานข้อมูลทีม อาจเกิดรายการซ้ำได้ถ้าทีมมีข้อมูลอยู่แล้ว ต้องการดำเนินการต่อหรือไม่?`,
+    async ()=>{
+      const d = fbdb();
+      const mergedProjects = Array.from(new Set([...(state.projects||[]), ...(local.projects||[])]));
+      await d.ref('projects').set(mergedProjects);
+      const mergedResp = Array.from(new Set([...(state.responsibles||[]), ...(local.responsibles||[])]));
+      await d.ref('responsibles').set(mergedResp);
+      for(const t of (local.tasks||[])){
+        const copy = Object.assign({}, t);
+        delete copy.id;
+        await d.ref('tasks').push().set(copy);
+      }
+      for(const t of (local.deletedTasks||[])){
+        const copy = Object.assign({}, t);
+        delete copy.id;
+        await d.ref('deletedTasks').push().set(copy);
+      }
+      alert('ย้ายข้อมูลเรียบร้อยแล้ว');
+      document.getElementById('teamSettingsOverlay').classList.remove('show');
+    }
+  );
+}
+
+/* ---------------- Google Calendar integration (OAuth, GIS token client) ---------------- */
+let gcalConfig = { clientId:'', calendarId:'primary' };
+let gcalTokenClient = null;
+let gcalAccessToken = null;
+
+function loadGcalConfig(){
+  try{
+    const raw = localStorage.getItem(GCAL_CONFIG_KEY);
+    if(raw) gcalConfig = Object.assign(gcalConfig, JSON.parse(raw));
+  }catch(e){}
+}
+function saveGcalConfig(){
+  try{ localStorage.setItem(GCAL_CONFIG_KEY, JSON.stringify(gcalConfig)); }catch(e){}
+}
+
+function isFileOrigin(){
+  return location.protocol === 'file:';
+}
+
+function updateGcalStatusUI(){
+  const box = document.getElementById('gcalStatus');
+  const txt = document.getElementById('gcalStatusText');
+  const btn = document.getElementById('btnGcalConnect');
+  if(gcalAccessToken){
+    box.classList.add('connected');
+    txt.textContent = 'เชื่อมต่อ Google Calendar แล้ว';
+    btn.textContent = 'ตัดการเชื่อมต่อ';
+  }else{
+    box.classList.remove('connected');
+    txt.textContent = 'ยังไม่เชื่อมต่อ Google Calendar';
+    btn.textContent = 'เชื่อมต่อ';
+  }
+}
+
+function ensureTokenClient(){
+  if(gcalTokenClient || !window.google || !gcalConfig.clientId) return gcalTokenClient;
+  gcalTokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: gcalConfig.clientId,
+    scope: GCAL_SCOPE,
+    callback: (resp)=>{
+      if(resp && resp.access_token){
+        gcalAccessToken = resp.access_token;
+        updateGcalStatusUI();
+      }
+    },
+  });
+  return gcalTokenClient;
+}
+
+function connectGoogleCalendar(){
+  if(gcalAccessToken){
+    gcalAccessToken = null;
+    updateGcalStatusUI();
+    return;
+  }
+  if(isFileOrigin()){
+    alert('ไม่สามารถเชื่อมต่อ Google ได้ขณะเปิดไฟล์แบบ file:// กรุณาเปิดผ่านลิงก์ https:// ที่โฮสต์ไว้ก่อน');
+    return;
+  }
+  if(!gcalConfig.clientId){
+    document.getElementById('gcalSettingsOverlay').classList.add('show');
+    return;
+  }
+  const client = ensureTokenClient();
+  if(!client){
+    alert('ไลบรารี Google Identity Services ยังโหลดไม่เสร็จ กรุณาลองใหม่อีกครั้งในอีกสักครู่');
+    return;
+  }
+  client.requestAccessToken();
+}
+
+function addOneDay(iso){
+  const d = new Date(iso + 'T00:00:00');
+  d.setDate(d.getDate()+1);
+  return d.toISOString().slice(0,10);
+}
+
+function buildEventPayload(t){
+  const lines = [];
+  if(t.category) lines.push(`หมวดหมู่/Routine: ${t.category}`);
+  lines.push(`Project: ${t.project || '-'}`);
+  lines.push(`ผู้รับผิดชอบ: ${t.responsible || '-'}`);
+  if(t.detail) lines.push(`\nรายละเอียด:\n${t.detail}`);
+  if(t.remark) lines.push(`\nหมายเหตุ:\n${t.remark}`);
+  return {
+    summary: `[${statusDef(t.status).label}] ${t.taskName}`,
+    description: lines.join('\n'),
+    start: { date: t.target },
+    end: { date: addOneDay(t.target) },
+  };
+}
+
+async function gcalFetch(path, options){
+  const calId = encodeURIComponent(gcalConfig.calendarId || 'primary');
+  const res = await fetch(`https://www.googleapis.com/calendar/v3/calendars/${calId}/events${path}`, Object.assign({
+    headers: Object.assign({
+      'Authorization': `Bearer ${gcalAccessToken}`,
+      'Content-Type': 'application/json',
+    }, (options && options.headers) || {})
+  }, options));
+  return res;
+}
+
+async function syncTaskToCalendar(task){
+  if(!gcalAccessToken || task.syncCal === false) return;
+  try{
+    if(!task.target){
+      if(task.googleEventId){
+        await gcalFetch(`/${task.googleEventId}`, { method:'DELETE' });
+        await persistUpdateTask(task.id, { googleEventId:null });
+      }
+      return;
+    }
+    const payload = buildEventPayload(task);
+    let res;
+    if(task.googleEventId){
+      res = await gcalFetch(`/${task.googleEventId}`, { method:'PATCH', body: JSON.stringify(payload) });
+      if(res.status === 404){
+        res = await gcalFetch('', { method:'POST', body: JSON.stringify(payload) });
+      }
+    }else{
+      res = await gcalFetch('', { method:'POST', body: JSON.stringify(payload) });
+    }
+    if(res.ok){
+      const data = await res.json();
+      await persistUpdateTask(task.id, { googleEventId: data.id });
+    }else{
+      console.error('Google Calendar sync failed', await res.text());
+    }
+  }catch(e){
+    console.error('Google Calendar sync error', e);
+  }
+}
+
+async function deleteTaskCalendarEvent(task){
+  if(!gcalAccessToken || !task.googleEventId) return;
+  try{
+    await gcalFetch(`/${task.googleEventId}`, { method:'DELETE' });
+  }catch(e){
+    console.error('Google Calendar delete error', e);
+  }
+}
+
+/* ---------------- Init & Events ---------------- */
+async function init(){
+  loadFirebaseConfig();
+  loadGcalConfig();
+  loadCollapsedGroups();
+  await loadState();
+  renderStatusChips();
+  renderTable();
+  updateGcalStatusUI();
+  updateTeamStatusUI();
+
+  if(isFileOrigin()){
+    document.getElementById('originWarning').classList.add('show');
+  }
+
+  document.getElementById('btnAddTask').addEventListener('click', ()=>openTaskModal(null));
+  document.getElementById('btnCancelTask').addEventListener('click', closeTaskModal);
+  document.getElementById('btnSaveTask').addEventListener('click', saveTaskFromModal);
+  document.getElementById('taskOverlay').addEventListener('click', (e)=>{ if(e.target.id==='taskOverlay') closeTaskModal(); });
+
+  document.getElementById('btnManageProjects').addEventListener('click', ()=>{
+    renderProjList();
+    document.getElementById('projOverlay').classList.add('show');
+  });
+  document.getElementById('btnCloseProj').addEventListener('click', ()=>{
+    document.getElementById('projOverlay').classList.remove('show');
+  });
+  document.getElementById('projOverlay').addEventListener('click', (e)=>{ if(e.target.id==='projOverlay') document.getElementById('projOverlay').classList.remove('show'); });
+  document.getElementById('btnAddProj').addEventListener('click', addProject);
+  document.getElementById('newProjInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') addProject(); });
+
+  document.getElementById('btnManageResp').addEventListener('click', ()=>{
+    renderRespList();
+    document.getElementById('respOverlay').classList.add('show');
+  });
+  document.getElementById('btnCloseResp').addEventListener('click', ()=>{
+    document.getElementById('respOverlay').classList.remove('show');
+  });
+  document.getElementById('respOverlay').addEventListener('click', (e)=>{ if(e.target.id==='respOverlay') document.getElementById('respOverlay').classList.remove('show'); });
+  document.getElementById('btnAddResp').addEventListener('click', addResp);
+  document.getElementById('newRespInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') addResp(); });
+
+  document.getElementById('btnConfirmCancel').addEventListener('click', closeConfirm);
+  document.getElementById('confirmOverlay').addEventListener('click', (e)=>{ if(e.target.id==='confirmOverlay') closeConfirm(); });
+  document.getElementById('btnConfirmOk').addEventListener('click', async ()=>{
+    if(confirmCallback) await confirmCallback();
+    closeConfirm();
+  });
+
+  document.getElementById('searchInput').addEventListener('input', renderTable);
+
+  document.getElementById('btnExportExcel').addEventListener('click', openExportModal);
+  document.getElementById('btnCancelExport').addEventListener('click', closeExportModal);
+  document.getElementById('exportOverlay').addEventListener('click', (e)=>{ if(e.target.id==='exportOverlay') closeExportModal(); });
+  document.getElementById('btnConfirmExport').addEventListener('click', exportToExcel);
+  document.getElementById('btnExportSelectAll').addEventListener('click', ()=>{
+    EXPORT_COLUMNS.forEach(c=>{ document.getElementById(`exp_${c.key}`).checked = true; });
+  });
+  document.getElementById('btnExportSelectNone').addEventListener('click', ()=>{
+    EXPORT_COLUMNS.forEach(c=>{ document.getElementById(`exp_${c.key}`).checked = false; });
+  });
+  document.getElementById('exportTaskSearch').addEventListener('input', (e)=>{
+    renderExportTaskList(e.target.value);
+  });
+  document.getElementById('btnExportTaskSelectAll').addEventListener('click', ()=>{
+    exportSelectedTaskIds = new Set(state.tasks.map(t=>t.id));
+    renderExportTaskList(document.getElementById('exportTaskSearch').value);
+  });
+  document.getElementById('btnExportTaskSelectNone').addEventListener('click', ()=>{
+    exportSelectedTaskIds = new Set();
+    renderExportTaskList(document.getElementById('exportTaskSearch').value);
+  });
+
+  document.getElementById('btnHistory').addEventListener('click', ()=>{
+    renderHistoryList();
+    document.getElementById('historyOverlay').classList.add('show');
+  });
+  document.getElementById('btnCloseHistory').addEventListener('click', ()=>{
+    document.getElementById('historyOverlay').classList.remove('show');
+  });
+  document.getElementById('historyOverlay').addEventListener('click', (e)=>{ if(e.target.id==='historyOverlay') document.getElementById('historyOverlay').classList.remove('show'); });
+
+  document.getElementById('btnBackupExport').addEventListener('click', exportBackupJson);
+  document.getElementById('backupImportInput').addEventListener('change', (e)=>{
+    const file = e.target.files[0];
+    if(file) importBackupJson(file);
+    e.target.value = '';
+  });
+
+  document.getElementById('btnGcalConnect').addEventListener('click', connectGoogleCalendar);
+  document.getElementById('btnGcalSettings').addEventListener('click', ()=>{
+    document.getElementById('gcalClientIdInput').value = gcalConfig.clientId || '';
+    document.getElementById('gcalCalendarIdInput').value = gcalConfig.calendarId || '';
+    document.getElementById('gcalSettingsOverlay').classList.add('show');
+  });
+  document.getElementById('btnCloseGcalSettings').addEventListener('click', ()=>{
+    document.getElementById('gcalSettingsOverlay').classList.remove('show');
+  });
+  document.getElementById('gcalSettingsOverlay').addEventListener('click', (e)=>{ if(e.target.id==='gcalSettingsOverlay') document.getElementById('gcalSettingsOverlay').classList.remove('show'); });
+  document.getElementById('btnSaveGcalSettings').addEventListener('click', ()=>{
+    gcalConfig.clientId = document.getElementById('gcalClientIdInput').value.trim();
+    gcalConfig.calendarId = document.getElementById('gcalCalendarIdInput').value.trim() || 'primary';
+    gcalTokenClient = null;
+    saveGcalConfig();
+    document.getElementById('gcalSettingsOverlay').classList.remove('show');
+  });
+
+  document.getElementById('btnTeamConnect').addEventListener('click', connectTeamMode);
+  document.getElementById('btnTeamSettings').addEventListener('click', ()=>{
+    document.getElementById('fbApiKeyInput').value = firebaseConfig.apiKey || '';
+    document.getElementById('fbAuthDomainInput').value = firebaseConfig.authDomain || '';
+    document.getElementById('fbDatabaseUrlInput').value = firebaseConfig.databaseURL || '';
+    document.getElementById('fbProjectIdInput').value = firebaseConfig.projectId || '';
+    document.getElementById('fbAppIdInput').value = firebaseConfig.appId || '';
+    document.getElementById('teamSettingsOverlay').classList.add('show');
+  });
+  document.getElementById('btnCloseTeamSettings').addEventListener('click', ()=>{
+    document.getElementById('teamSettingsOverlay').classList.remove('show');
+  });
+  document.getElementById('teamSettingsOverlay').addEventListener('click', (e)=>{ if(e.target.id==='teamSettingsOverlay') document.getElementById('teamSettingsOverlay').classList.remove('show'); });
+  document.getElementById('btnSaveTeamSettings').addEventListener('click', ()=>{
+    firebaseConfig.apiKey = document.getElementById('fbApiKeyInput').value.trim();
+    firebaseConfig.authDomain = document.getElementById('fbAuthDomainInput').value.trim();
+    firebaseConfig.databaseURL = document.getElementById('fbDatabaseUrlInput').value.trim();
+    firebaseConfig.projectId = document.getElementById('fbProjectIdInput').value.trim();
+    firebaseConfig.appId = document.getElementById('fbAppIdInput').value.trim();
+    saveFirebaseConfig();
+    document.getElementById('teamSettingsOverlay').classList.remove('show');
+  });
+  document.getElementById('btnMigrateToTeam').addEventListener('click', migrateLocalDataToFirebase);
+}
+
+init();
+</script>
+</body>
+</html>
