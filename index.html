@@ -243,6 +243,7 @@
     border-radius:10px; padding:6px 8px 6px 12px;
   }
   .manage-item input{flex:1; border:none; background:transparent; font-family:'Sarabun',sans-serif; font-size:14px; outline:none; color:var(--ink);}
+  .status-dot{width:16px; height:16px; border-radius:50%; border:2px solid; flex:none;}
   .manage-add{display:flex; gap:8px; flex-wrap:wrap;}
   .manage-add input{flex:1; min-width:160px;}
 
@@ -325,6 +326,7 @@
   <div class="toolbar">
     <button class="btn btn-ghost" id="btnManageProjects">จัดการ Project</button>
     <button class="btn btn-ghost" id="btnManageResp">จัดการผู้รับผิดชอบ</button>
+    <button class="btn btn-ghost" id="btnManageStatus">จัดการ Status</button>
     <button class="btn btn-ghost" id="btnHistory">
       <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#437074" stroke-width="2"><path d="M3 12a9 9 0 1 0 3-6.7"/><path d="M3 4v5h5"/><path d="M12 8v4l3 2"/></svg>
       ประวัติที่ลบ
@@ -436,6 +438,22 @@
     </div>
     <div class="modal-actions">
       <button class="btn btn-ghost" id="btnCloseResp">ปิด</button>
+    </div>
+  </div>
+</div>
+
+<!-- Manage Status Modal -->
+<div class="overlay" id="statusOverlay">
+  <div class="modal modal-sm">
+    <h2>จัดการ Status</h2>
+    <p class="hint-text">งานที่ใช้ Status ที่ถูกลบจะยังเก็บชื่อเดิมไว้ (แสดงเป็นสีเทา) สีของ Status ใหม่จะถูกกำหนดให้อัตโนมัติ</p>
+    <div class="manage-list" id="statusList"></div>
+    <div class="manage-add">
+      <input type="text" id="newStatusInput" placeholder="เพิ่มชื่อ Status ใหม่...">
+      <button class="btn btn-primary btn-sm" id="btnAddStatus">เพิ่ม</button>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost" id="btnCloseStatus">ปิด</button>
     </div>
   </div>
 </div>
@@ -563,12 +581,22 @@
 </div>
 
 <script>
-const STATUS_DEFS = [
-  { key:'Inprogress',      label:'Inprogress',      bg:'var(--st-inprogress-bg)', fg:'var(--st-inprogress-fg)' },
-  { key:'Completed',       label:'Completed',       bg:'var(--st-completed-bg)',  fg:'var(--st-completed-fg)' },
-  { key:'Monthly',         label:'Monthly',         bg:'var(--st-monthly-bg)',    fg:'var(--st-monthly-fg)' },
-  { key:'Specific Period', label:'Specific Period', bg:'var(--st-specific-bg)',   fg:'var(--st-specific-fg)' },
-  { key:'Hold',            label:'Hold',            bg:'var(--st-hold-bg)',       fg:'var(--st-hold-fg)' },
+const DEFAULT_STATUSES = [
+  { label:'Inprogress',      bg:'#C9E0FF', fg:'#1D4E89' },
+  { label:'Completed',       bg:'#C3EAD1', fg:'#1E6B3B' },
+  { label:'Monthly',         bg:'#FFDCB0', fg:'#8A4E00' },
+  { label:'Specific Period', bg:'#FFF0A8', fg:'#7A5D00' },
+  { label:'Hold',            bg:'#E3E1DC', fg:'#5B5952' },
+];
+const STATUS_COLOR_PALETTE = [
+  { bg:'#C9E0FF', fg:'#1D4E89' },
+  { bg:'#C3EAD1', fg:'#1E6B3B' },
+  { bg:'#FFDCB0', fg:'#8A4E00' },
+  { bg:'#FFF0A8', fg:'#7A5D00' },
+  { bg:'#E3E1DC', fg:'#5B5952' },
+  { bg:'#F7D8D6', fg:'#9A2E2E' },
+  { bg:'#E3D7F5', fg:'#5B3A8C' },
+  { bg:'#D6EEF5', fg:'#1D6F89' },
 ];
 const STORAGE_KEY = 'oso-tasks-state-v3';
 const GCAL_CONFIG_KEY = 'oso-tasks-gcal-config-v1';
@@ -588,6 +616,7 @@ function defaultState(){
     nextId: 4,
     projects: ['ALL Project','Thailand APPS and PNR','PIBICS','TDAC','PNG'],
     responsibles: ['OSO Team','พิมพ์','เบส Consult'],
+    statuses: DEFAULT_STATUSES.slice(),
     deletedTasks: [],
     tasks: [
       {
@@ -619,6 +648,7 @@ async function loadState(){
     if(raw){
       state = JSON.parse(raw);
       if(!Array.isArray(state.deletedTasks)) state.deletedTasks = [];
+      if(!Array.isArray(state.statuses) || !state.statuses.length) state.statuses = DEFAULT_STATUSES.slice();
       return;
     }
   }catch(e){ /* corrupted -> fall through to default */ }
@@ -663,16 +693,17 @@ function formatThaiDate(iso){
   }catch(e){ return escapeHtml(iso); }
 }
 
-function statusDef(key){
-  return STATUS_DEFS.find(s=>s.key===key) || STATUS_DEFS[0];
+function statusDef(label){
+  const list = (state && state.statuses && state.statuses.length) ? state.statuses : DEFAULT_STATUSES;
+  return list.find(s=>s.label===label) || { label: label || '—', bg:'#E3E1DC', fg:'#5B5952' };
 }
 
 function renderStatusChips(){
   const el = document.getElementById('statusChips');
-  const chips = [{key:'ALL', label:'ทั้งหมด'}, ...STATUS_DEFS];
+  const chips = [{label:'ALL', display:'ทั้งหมด'}, ...state.statuses.map(s=>({label:s.label, display:s.label}))];
   el.innerHTML = chips.map(c=>{
-    const active = activeStatusFilter === c.key ? 'active' : '';
-    return `<div class="chip ${active}" data-status="${escapeHtml(c.key)}">${escapeHtml(c.label)}</div>`;
+    const active = activeStatusFilter === c.label ? 'active' : '';
+    return `<div class="chip ${active}" data-status="${escapeHtml(c.label)}">${escapeHtml(c.display)}</div>`;
   }).join('');
   el.querySelectorAll('.chip').forEach(chip=>{
     chip.addEventListener('click', ()=>{
@@ -786,7 +817,7 @@ function toggleGroup(projectName){
 /* ---------------- Task Modal ---------------- */
 function populateSelectOptions(){
   const statusSel = document.getElementById('f_status');
-  statusSel.innerHTML = STATUS_DEFS.map(s=>`<option value="${escapeHtml(s.key)}">${escapeHtml(s.label)}</option>`).join('');
+  statusSel.innerHTML = state.statuses.map(s=>`<option value="${escapeHtml(s.label)}">${escapeHtml(s.label)}</option>`).join('');
 
   const projSel = document.getElementById('f_project');
   projSel.innerHTML = state.projects.map(p=>`<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`).join('');
@@ -817,7 +848,7 @@ function openTaskModal(id){
   }else{
     title.textContent = 'เพิ่มงานใหม่';
     document.getElementById('taskId').value = '';
-    document.getElementById('f_status').value = 'Inprogress';
+    document.getElementById('f_status').value = (state.statuses[0] && state.statuses[0].label) || '';
     document.getElementById('f_target').value = '';
     document.getElementById('f_category').value = '';
     document.getElementById('f_project').value = state.projects[0] || '';
@@ -924,6 +955,15 @@ async function persistResponsibles(newArr){
   state.responsibles = newArr;
   if(teamMode){
     await fbdb().ref('responsibles').set(newArr);
+  }else{
+    await saveState();
+  }
+}
+
+async function persistStatuses(newArr){
+  state.statuses = newArr;
+  if(teamMode){
+    await fbdb().ref('statuses').set(newArr);
   }else{
     await saveState();
   }
@@ -1108,6 +1148,63 @@ async function addResp(){
   renderRespList();
 }
 
+/* ---------------- Manage Status ---------------- */
+function renderStatusList(){
+  const el = document.getElementById('statusList');
+  el.innerHTML = state.statuses.map((s,i)=>`
+    <div class="manage-item">
+      <span class="status-dot" style="background:${s.bg}; border-color:${s.fg};"></span>
+      <input type="text" value="${escapeHtml(s.label)}" data-idx="${i}" class="status-input">
+      <button class="icon-btn danger" title="ลบ" onclick="deleteStatus(${i})">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 6h18"/><path d="M8 6V4h8v2"/><path d="M19 6l-1 14H6L5 6"/></svg>
+      </button>
+    </div>`).join('');
+  el.querySelectorAll('.status-input').forEach(input=>{
+    input.addEventListener('change', async (e)=>{
+      const idx = parseInt(e.target.getAttribute('data-idx'),10);
+      const oldVal = state.statuses[idx].label;
+      const newVal = e.target.value.trim();
+      if(!newVal){ e.target.value = oldVal; return; }
+      const newArr = state.statuses.map(s=>Object.assign({}, s));
+      newArr[idx].label = newVal;
+      state.tasks.forEach(t=>{ if(t.status === oldVal) t.status = newVal; });
+      await persistStatuses(newArr);
+      renderStatusChips();
+      renderTable();
+    });
+  });
+}
+
+function deleteStatus(idx){
+  const name = state.statuses[idx].label;
+  if(state.statuses.length <= 1){
+    alert('ต้องมี Status เหลืออย่างน้อย 1 รายการ');
+    return;
+  }
+  showConfirm('ลบ Status', `ต้องการลบ "${escapeHtml(name)}" หรือไม่? งานที่ใช้ Status นี้จะยังเก็บชื่อเดิมไว้`, async ()=>{
+    const newArr = state.statuses.slice();
+    newArr.splice(idx,1);
+    await persistStatuses(newArr);
+    renderStatusList();
+    renderStatusChips();
+    renderTable();
+  });
+}
+
+async function addStatus(){
+  const input = document.getElementById('newStatusInput');
+  const val = input.value.trim();
+  if(!val) return;
+  if(state.statuses.some(s=>s.label===val)){ input.value=''; return; }
+  const color = STATUS_COLOR_PALETTE[state.statuses.length % STATUS_COLOR_PALETTE.length];
+  const newArr = state.statuses.slice();
+  newArr.push({ label: val, bg: color.bg, fg: color.fg });
+  input.value = '';
+  await persistStatuses(newArr);
+  renderStatusList();
+  renderStatusChips();
+}
+
 /* ---------------- Export to Excel ---------------- */
 const EXPORT_COLUMNS = [
   { key:'status',      label:'Status' },
@@ -1276,6 +1373,7 @@ function importBackupJson(file){
         const d = fbdb();
         await d.ref('projects').set(data.projects || []);
         await d.ref('responsibles').set(data.responsibles || []);
+        await d.ref('statuses').set((data.statuses && data.statuses.length) ? data.statuses : DEFAULT_STATUSES.slice());
         const tasksObj = {};
         (data.tasks || []).forEach(t=>{
           const copy = Object.assign({}, t);
@@ -1296,11 +1394,13 @@ function importBackupJson(file){
         state = data;
         if(!Array.isArray(state.projects)) state.projects = defaultState().projects;
         if(!Array.isArray(state.responsibles)) state.responsibles = defaultState().responsibles;
+        if(!Array.isArray(state.statuses) || !state.statuses.length) state.statuses = DEFAULT_STATUSES.slice();
         if(!Array.isArray(state.tasks)) state.tasks = [];
         if(!Array.isArray(state.deletedTasks)) state.deletedTasks = [];
         const maxId = state.tasks.reduce((m,t)=>Math.max(m, parseInt(t.id,10) || 0), 0);
         state.nextId = maxId + 1;
         await saveState();
+        renderStatusChips();
         renderTable();
       }
     }, 'นำเข้าข้อมูล');
@@ -1371,6 +1471,13 @@ function attachFirebaseListeners(){
     const val = snap.val();
     state.responsibles = (Array.isArray(val) && val.length) ? val : defaultState().responsibles;
   });
+  fbRefs.statuses = d.ref('statuses');
+  fbRefs.statuses.on('value', snap=>{
+    const val = snap.val();
+    state.statuses = (Array.isArray(val) && val.length) ? val : DEFAULT_STATUSES.slice();
+    renderStatusChips();
+    renderTable();
+  });
   fbRefs.tasks = d.ref('tasks');
   fbRefs.tasks.on('value', snap=>{
     const val = snap.val() || {};
@@ -1437,6 +1544,9 @@ async function migrateLocalDataToFirebase(){
       await d.ref('projects').set(mergedProjects);
       const mergedResp = Array.from(new Set([...(state.responsibles||[]), ...(local.responsibles||[])]));
       await d.ref('responsibles').set(mergedResp);
+      const existingLabels = new Set((state.statuses||[]).map(s=>s.label));
+      const mergedStatuses = (state.statuses||[]).concat((local.statuses||[]).filter(s=>!existingLabels.has(s.label)));
+      await d.ref('statuses').set(mergedStatuses.length ? mergedStatuses : DEFAULT_STATUSES.slice());
       for(const t of (local.tasks||[])){
         const copy = Object.assign({}, t);
         delete copy.id;
@@ -1643,6 +1753,17 @@ async function init(){
   document.getElementById('respOverlay').addEventListener('click', (e)=>{ if(e.target.id==='respOverlay') document.getElementById('respOverlay').classList.remove('show'); });
   document.getElementById('btnAddResp').addEventListener('click', addResp);
   document.getElementById('newRespInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') addResp(); });
+
+  document.getElementById('btnManageStatus').addEventListener('click', ()=>{
+    renderStatusList();
+    document.getElementById('statusOverlay').classList.add('show');
+  });
+  document.getElementById('btnCloseStatus').addEventListener('click', ()=>{
+    document.getElementById('statusOverlay').classList.remove('show');
+  });
+  document.getElementById('statusOverlay').addEventListener('click', (e)=>{ if(e.target.id==='statusOverlay') document.getElementById('statusOverlay').classList.remove('show'); });
+  document.getElementById('btnAddStatus').addEventListener('click', addStatus);
+  document.getElementById('newStatusInput').addEventListener('keydown', (e)=>{ if(e.key==='Enter') addStatus(); });
 
   document.getElementById('btnConfirmCancel').addEventListener('click', closeConfirm);
   document.getElementById('confirmOverlay').addEventListener('click', (e)=>{ if(e.target.id==='confirmOverlay') closeConfirm(); });
