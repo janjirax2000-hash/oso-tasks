@@ -321,6 +321,11 @@
     กรุณาเปิดผ่านลิงก์ https:// ที่โฮสต์ไว้ (เช่น GitHub Pages) จึงจะเชื่อมต่อ Google Calendar ได้
   </div>
 
+  <div class="origin-warning" id="inAppWarning">
+    ⚠️ ดูเหมือนคุณเปิดหน้านี้จากในแอปแชท (เช่น LINE, Facebook, Instagram) ซึ่ง Google ไม่อนุญาตให้ล็อกอินจากเบราว์เซอร์ในแอปเหล่านี้ได้
+    กรุณาแตะเมนู "•••" มุมบนขวา แล้วเลือก <strong>"เปิดในเบราว์เซอร์"</strong> (Open in browser / Safari / Chrome) ก่อนกดเชื่อมต่อ Google Calendar
+  </div>
+
   <div class="status-bar">
     <div class="status-pill" id="teamStatus">
       <div class="dot"></div>
@@ -649,7 +654,10 @@
 
     <div class="guide-section">
       <h3>📅 Google Calendar</h3>
-      <p>งานที่มี "Target Finished" สามารถซิงก์ขึ้น Google Calendar ส่วนตัวได้อัตโนมัติ โดยกดปุ่ม "เชื่อมต่อ" ที่สถานะ Google Calendar มุมบน (ต้องตั้งค่า OAuth Client ID ก่อนใช้งานครั้งแรก)</p>
+      <p>งานที่มี "Target Finished" สามารถซิงก์ขึ้น Google Calendar ส่วนตัวได้อัตโนมัติ โดยกดปุ่ม "เชื่อมต่อ" ที่สถานะ Google Calendar มุมบน (ต้องตั้งค่า OAuth Client ID ก่อนใช้งานครั้งแรก) ใช้งานบนมือถือได้เหมือนกันทุกขั้นตอน</p>
+      <div class="guide-note">
+        ⚠️ ถ้าเปิดลิงก์นี้จากในแอปแชท (LINE, Facebook, Instagram) แล้วกด "เชื่อมต่อ" Google Calendar จะไม่ยอมให้ล็อกอิน — ต้องแตะเมนู "•••" แล้วเลือก "เปิดในเบราว์เซอร์" (Safari/Chrome) ก่อน แอปจะเตือนให้อัตโนมัติถ้าตรวจพบ
+      </div>
     </div>
 
     <div class="modal-actions">
@@ -1766,6 +1774,11 @@ function isFileOrigin(){
   return location.protocol === 'file:';
 }
 
+function isInAppBrowser(){
+  const ua = navigator.userAgent || '';
+  return /Line\//i.test(ua) || /FBAN|FBAV/i.test(ua) || /Instagram/i.test(ua) || /MicroMessenger/i.test(ua);
+}
+
 function updateGcalStatusUI(){
   const box = document.getElementById('gcalStatus');
   const txt = document.getElementById('gcalStatusText');
@@ -1804,6 +1817,10 @@ function connectGoogleCalendar(){
   }
   if(isFileOrigin()){
     alert('ไม่สามารถเชื่อมต่อ Google ได้ขณะเปิดไฟล์แบบ file:// กรุณาเปิดผ่านลิงก์ https:// ที่โฮสต์ไว้ก่อน');
+    return;
+  }
+  if(isInAppBrowser()){
+    alert('Google ไม่อนุญาตให้ล็อกอินจากเบราว์เซอร์ในแอปแชท (เช่น LINE, Facebook) กรุณาแตะเมนู "•••" แล้วเลือก "เปิดในเบราว์เซอร์" (Safari/Chrome) ก่อนลองใหม่');
     return;
   }
   if(!gcalConfig.clientId){
@@ -1908,6 +1925,9 @@ async function init(){
 
   if(isFileOrigin()){
     document.getElementById('originWarning').classList.add('show');
+  }
+  if(isInAppBrowser()){
+    document.getElementById('inAppWarning').classList.add('show');
   }
 
   document.getElementById('btnAddTask').addEventListener('click', ()=>openTaskModal(null));
