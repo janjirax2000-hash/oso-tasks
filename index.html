@@ -1761,10 +1761,14 @@ let gcalTokenClient = null;
 let gcalAccessToken = null;
 
 function loadGcalConfig(){
+  const builtInClientId = gcalConfig.clientId;
   try{
     const raw = localStorage.getItem(GCAL_CONFIG_KEY);
     if(raw) gcalConfig = Object.assign(gcalConfig, JSON.parse(raw));
   }catch(e){}
+  if(!/\.apps\.googleusercontent\.com$/.test(gcalConfig.clientId || '')){
+    gcalConfig.clientId = builtInClientId;
+  }
 }
 function saveGcalConfig(){
   try{ localStorage.setItem(GCAL_CONFIG_KEY, JSON.stringify(gcalConfig)); }catch(e){}
@@ -2042,7 +2046,12 @@ async function init(){
   });
   document.getElementById('gcalSettingsOverlay').addEventListener('click', (e)=>{ if(e.target.id==='gcalSettingsOverlay') document.getElementById('gcalSettingsOverlay').classList.remove('show'); });
   document.getElementById('btnSaveGcalSettings').addEventListener('click', ()=>{
-    gcalConfig.clientId = document.getElementById('gcalClientIdInput').value.trim();
+    const clientId = document.getElementById('gcalClientIdInput').value.trim();
+    if(!/\.apps\.googleusercontent\.com$/.test(clientId)){
+      alert('Client ID ดูไม่ถูกต้อง — ต้องลงท้ายด้วย .apps.googleusercontent.com กรุณาตรวจสอบและวางค่าใหม่');
+      return;
+    }
+    gcalConfig.clientId = clientId;
     gcalConfig.calendarId = document.getElementById('gcalCalendarIdInput').value.trim() || 'primary';
     gcalTokenClient = null;
     saveGcalConfig();
