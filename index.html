@@ -166,7 +166,7 @@
   .group-body{overflow:auto; max-height:none; -webkit-overflow-scrolling:touch;}
   .group-card.collapsed .group-body{display:none;}
 
-  table{width:100%; border-collapse:collapse; min-width:1100px;}
+  table{width:100%; border-collapse:collapse; min-width:1400px;}
   thead th{
     background:#FAF9F5; color:var(--teal-dark);
     font-family:'Kanit',sans-serif; font-weight:600; font-size:13px;
@@ -178,10 +178,12 @@
     border-bottom:1px solid var(--line);
   }
   tbody tr:last-child td{border-bottom:none;}
-  tbody tr:hover{background:#FBFAF6;}
+  tbody tr:nth-child(odd){background:#FFFFFF;}
+  tbody tr:nth-child(even){background:#F3F0E7;}
+  tbody tr:hover{background:#E9F2F1;}
   tbody tr.empty-row td{text-align:center; color:var(--muted); padding:40px; font-size:14px;}
-  .cell-detail{white-space:pre-wrap; max-width:320px; color:#4A4A46; line-height:1.5;}
-  .cell-remark{white-space:pre-wrap; max-width:200px; color:#4A4A46; line-height:1.5;}
+  .cell-detail{white-space:pre-wrap; max-width:560px; color:#4A4A46; line-height:1.5;}
+  .cell-remark{white-space:pre-wrap; max-width:220px; color:#4A4A46; line-height:1.5;}
   .muted-dash{color:var(--muted);}
 
   .pill{
@@ -190,6 +192,11 @@
   }
   .pill-project{background:#EFEAE0; color:var(--teal-dark); font-weight:600;}
   .pill-responsible{background:#F0E9DE; color:#7A5A2E; font-weight:600;}
+  .responsible-select{
+    font-family:'Sarabun',sans-serif; font-size:12.5px; font-weight:700;
+    border:1px solid transparent; border-radius:999px; padding:5px 10px;
+    cursor:pointer; outline:none; appearance:none; -webkit-appearance:none;
+  }
   .pill-cal, .pill-overdue{
     display:inline-flex; align-items:center; gap:4px;
     font-size:11px; font-weight:700; border-radius:999px; padding:3px 9px; margin-top:6px;
@@ -588,7 +595,7 @@ const DEFAULT_STATUSES = [
   { label:'Specific Period', bg:'#FFF0A8', fg:'#7A5D00' },
   { label:'Hold',            bg:'#E3E1DC', fg:'#5B5952' },
 ];
-const STATUS_COLOR_PALETTE = [
+const COLOR_PALETTE = [
   { bg:'#C9E0FF', fg:'#1D4E89' },
   { bg:'#C3EAD1', fg:'#1E6B3B' },
   { bg:'#FFDCB0', fg:'#8A4E00' },
@@ -598,6 +605,12 @@ const STATUS_COLOR_PALETTE = [
   { bg:'#E3D7F5', fg:'#5B3A8C' },
   { bg:'#D6EEF5', fg:'#1D6F89' },
 ];
+function colorForName(name){
+  const s = name || '—';
+  let hash = 0;
+  for(let i=0;i<s.length;i++){ hash = (hash*31 + s.charCodeAt(i)) >>> 0; }
+  return COLOR_PALETTE[hash % COLOR_PALETTE.length];
+}
 const STORAGE_KEY = 'oso-tasks-state-v3';
 const GCAL_CONFIG_KEY = 'oso-tasks-gcal-config-v1';
 const GCAL_COLLAPSED_KEY = 'oso-tasks-collapsed-groups-v1';
@@ -780,6 +793,16 @@ function renderTable(){
   wrap.innerHTML = html;
 }
 
+function responsibleSelectHtml(t){
+  const current = t.responsible || '';
+  const options = state.responsibles.includes(current) || !current
+    ? state.responsibles
+    : [current, ...state.responsibles];
+  return `<select class="responsible-select" data-id="${t.id}" style="background:${colorForName(current).bg}; color:${colorForName(current).fg};">
+    ${options.map(r=>`<option value="${escapeHtml(r)}" ${r===current?'selected':''}>${escapeHtml(r)}</option>`).join('')}
+  </select>`;
+}
+
 function rowHtml(t){
   const sd = statusDef(t.status);
   const calBadge = t.googleEventId ? `<div class="pill-cal">🗓 ซิงก์แล้ว</div>` : '';
@@ -793,7 +816,7 @@ function rowHtml(t){
       <td><strong>${escapeHtml(t.taskName)}</strong></td>
       <td class="cell-detail">${escapeHtml(t.detail) || '<span class="muted-dash">—</span>'}</td>
       <td class="cell-remark">${escapeHtml(t.remark) || '<span class="muted-dash">—</span>'}</td>
-      <td><span class="pill pill-responsible">${escapeHtml(t.responsible || '—')}</span></td>
+      <td>${responsibleSelectHtml(t)}</td>
       <td>
         <div class="row-actions">
           <button class="icon-btn" title="แก้ไข" onclick="openTaskModal('${t.id}')">
@@ -1196,7 +1219,7 @@ async function addStatus(){
   const val = input.value.trim();
   if(!val) return;
   if(state.statuses.some(s=>s.label===val)){ input.value=''; return; }
-  const color = STATUS_COLOR_PALETTE[state.statuses.length % STATUS_COLOR_PALETTE.length];
+  const color = COLOR_PALETTE[state.statuses.length % COLOR_PALETTE.length];
   const newArr = state.statuses.slice();
   newArr.push({ label: val, bg: color.bg, fg: color.fg });
   input.value = '';
@@ -1773,6 +1796,14 @@ async function init(){
   });
 
   document.getElementById('searchInput').addEventListener('input', renderTable);
+
+  document.getElementById('groupsWrap').addEventListener('change', async (e)=>{
+    if(!e.target.classList.contains('responsible-select')) return;
+    const id = e.target.getAttribute('data-id');
+    const newVal = e.target.value;
+    const t = await persistUpdateTask(id, { responsible: newVal });
+    if(t) syncTaskToCalendar(t).then(renderTable);
+  });
 
   document.getElementById('btnExportExcel').addEventListener('click', openExportModal);
   document.getElementById('btnCancelExport').addEventListener('click', closeExportModal);
