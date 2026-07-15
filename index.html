@@ -337,6 +337,7 @@
       <div class="dot"></div>
       <span class="txt" id="gcalStatusText">ยังไม่เชื่อมต่อ Google Calendar</span>
       <button id="btnGcalConnect">เชื่อมต่อ</button>
+      <button class="secondary" id="btnGcalSyncAll" title="ซิงก์งานเก่าทั้งหมดขึ้น Calendar" style="display:none;">ซิงก์ทั้งหมด</button>
       <button class="secondary" id="btnGcalSettings" title="ตั้งค่า Client ID">⚙</button>
     </div>
   </div>
@@ -655,6 +656,7 @@
     <div class="guide-section">
       <h3>📅 Google Calendar</h3>
       <p>งานที่มี "Target Finished" สามารถซิงก์ขึ้น Google Calendar ส่วนตัวได้อัตโนมัติ โดยกดปุ่ม "เชื่อมต่อ" ที่สถานะ Google Calendar มุมบน (ต้องตั้งค่า OAuth Client ID ก่อนใช้งานครั้งแรก) ใช้งานบนมือถือได้เหมือนกันทุกขั้นตอน</p>
+      <p>งานที่เพิ่ม/แก้ไขหลังเชื่อมต่อแล้วจะขึ้น Calendar ให้อัตโนมัติ ส่วนงานเก่าที่มีอยู่ก่อนเชื่อมต่อ ให้กดปุ่ม <strong>"ซิงก์ทั้งหมด"</strong> ที่โผล่ขึ้นมาข้างสถานะ Google Calendar (หลังเชื่อมต่อสำเร็จ) เพื่อดันงานเก่าทั้งหมดขึ้น Calendar ทีเดียว</p>
       <div class="guide-note">
         ⚠️ ถ้าเปิดลิงก์นี้จากในแอปแชท (LINE, Facebook, Instagram) แล้วกด "เชื่อมต่อ" Google Calendar จะไม่ยอมให้ล็อกอิน — ต้องแตะเมนู "•••" แล้วเลือก "เปิดในเบราว์เซอร์" (Safari/Chrome) ก่อน แอปจะเตือนให้อัตโนมัติถ้าตรวจพบ
       </div>
@@ -1787,15 +1789,44 @@ function updateGcalStatusUI(){
   const box = document.getElementById('gcalStatus');
   const txt = document.getElementById('gcalStatusText');
   const btn = document.getElementById('btnGcalConnect');
+  const syncAllBtn = document.getElementById('btnGcalSyncAll');
   if(gcalAccessToken){
     box.classList.add('connected');
     txt.textContent = 'เชื่อมต่อ Google Calendar แล้ว';
     btn.textContent = 'ตัดการเชื่อมต่อ';
+    syncAllBtn.style.display = '';
   }else{
     box.classList.remove('connected');
     txt.textContent = 'ยังไม่เชื่อมต่อ Google Calendar';
     btn.textContent = 'เชื่อมต่อ';
+    syncAllBtn.style.display = 'none';
   }
+}
+
+async function syncAllTasksToCalendar(){
+  if(!gcalAccessToken){
+    alert('กรุณาเชื่อมต่อ Google Calendar ก่อน');
+    return;
+  }
+  const targets = state.tasks.filter(t=>t.target && t.syncCal !== false);
+  if(targets.length === 0){
+    alert('ไม่มีงานที่มีวันที่ครบกำหนด (Target Finished) ให้ซิงก์');
+    return;
+  }
+  const btn = document.getElementById('btnGcalSyncAll');
+  const originalText = btn.textContent;
+  btn.textContent = `กำลังซิงก์ 0/${targets.length}...`;
+  btn.disabled = true;
+  let done = 0;
+  for(const t of targets){
+    await syncTaskToCalendar(t);
+    done++;
+    btn.textContent = `กำลังซิงก์ ${done}/${targets.length}...`;
+  }
+  btn.textContent = originalText;
+  btn.disabled = false;
+  renderTable();
+  alert(`ซิงก์เรียบร้อยแล้ว ${targets.length} งาน`);
 }
 
 function ensureTokenClient(){
@@ -2036,6 +2067,7 @@ async function init(){
   document.getElementById('guideOverlay').addEventListener('click', (e)=>{ if(e.target.id==='guideOverlay') document.getElementById('guideOverlay').classList.remove('show'); });
 
   document.getElementById('btnGcalConnect').addEventListener('click', connectGoogleCalendar);
+  document.getElementById('btnGcalSyncAll').addEventListener('click', syncAllTasksToCalendar);
   document.getElementById('btnGcalSettings').addEventListener('click', ()=>{
     document.getElementById('gcalClientIdInput').value = gcalConfig.clientId || '';
     document.getElementById('gcalCalendarIdInput').value = gcalConfig.calendarId || '';
