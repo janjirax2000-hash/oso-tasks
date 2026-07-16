@@ -191,12 +191,15 @@
     font-size:12.5px; font-weight:700; white-space:nowrap;
   }
   .pill-project{background:#EFEAE0; color:var(--teal-dark); font-weight:600;}
-  .pill-responsible{background:#F0E9DE; color:#7A5A2E; font-weight:600;}
-  .responsible-select{
-    font-family:'Sarabun',sans-serif; font-size:12.5px; font-weight:700;
-    border:1px solid transparent; border-radius:999px; padding:5px 10px;
-    cursor:pointer; outline:none; appearance:none; -webkit-appearance:none;
+  .pill-responsible{background:#F0E9DE; color:#7A5A2E; font-weight:600; margin:0 4px 4px 0; display:inline-block;}
+  .responsible-cell{display:flex; flex-wrap:wrap; gap:4px; max-width:180px;}
+  .checkbox-list{
+    display:flex; flex-direction:column; gap:6px; max-height:130px; overflow:auto;
+    border:1px solid var(--line); border-radius:9px; padding:8px 10px; background:#FCFBF8;
   }
+  .checkbox-item{display:flex; align-items:center; gap:8px; font-size:13.5px;}
+  .checkbox-item input{width:16px; height:16px; accent-color:var(--teal-dark); flex:none;}
+  .checkbox-item .dot{width:11px; height:11px; border-radius:50%; flex:none;}
   .pill-cal, .pill-overdue{
     display:inline-flex; align-items:center; gap:4px;
     font-size:11px; font-weight:700; border-radius:999px; padding:3px 9px; margin-top:6px;
@@ -428,8 +431,8 @@
         <textarea id="f_remark" placeholder="หมายเหตุ..."></textarea>
       </div>
       <div class="field">
-        <label>Responsible — ผู้รับผิดชอบ</label>
-        <select id="f_responsible"></select>
+        <label>Responsible — ผู้รับผิดชอบ (เลือกได้มากกว่า 1 คน)</label>
+        <div id="f_responsible_list" class="checkbox-list"></div>
       </div>
     </div>
     <div class="field-check">
@@ -615,7 +618,7 @@
         <li><strong>เพิ่มงานใหม่</strong>: กดปุ่ม "เพิ่มงานใหม่" มุมขวาบน กรอกรายละเอียดแล้วกด "บันทึก"</li>
         <li><strong>แก้ไขงาน</strong>: กดไอคอนดินสอ ✎ ท้ายแถวของงานนั้น</li>
         <li><strong>ลบงาน</strong>: กดไอคอนถังขยะ 🗑 — งานจะไม่หายทันที แต่ถูกย้ายไปเก็บใน <strong>"ประวัติที่ลบ"</strong> สามารถกด "กู้คืน" กลับมาได้ทุกเมื่อ หรือกด "ลบถาวร" ถ้าไม่ต้องการเก็บแล้วจริงๆ</li>
-        <li><strong>เปลี่ยนผู้รับผิดชอบเร็วๆ</strong>: คลิกที่ dropdown สีในคอลัมน์ "Responsible" ของแต่ละแถวได้เลย ไม่ต้องเปิดหน้าต่างแก้ไข</li>
+        <li><strong>ผู้รับผิดชอบหลายคน</strong>: หนึ่งงานมอบหมายได้มากกว่า 1 คน — ในหน้าต่างเพิ่ม/แก้ไขงาน ติ๊กเลือกได้หลายชื่อพร้อมกันในช่อง Responsible แต่ละคนจะโชว์เป็น badge สีในตาราง</li>
       </ul>
     </div>
 
@@ -720,6 +723,15 @@ function migrateNameColorList(arr, defaults){
 function projectDef(name){
   return (state.projects||[]).find(p=>p.name===name) || { name: name || '—', bg:'#EFEAE0', fg:'#3D6A6E' };
 }
+function normalizeResponsibleField(val){
+  if(Array.isArray(val)) return val;
+  if(typeof val === 'string' && val) return [val];
+  return [];
+}
+function normalizeTaskListResponsibles(list){
+  (list||[]).forEach(t=>{ t.responsible = normalizeResponsibleField(t.responsible); });
+  return list;
+}
 function responsibleDef(name){
   if(!name) return { name:'—', bg:'#F0E9DE', fg:'#7A5A2E' };
   const found = (state.responsibles||[]).find(r=>r.name===name);
@@ -762,20 +774,20 @@ function defaultState(){
         id:'1', status:'Completed', target:'', category:'',
         project:'ALL Project', taskName:'ข้อสอบ OSO',
         detail:'จัดทำข้อสอบสำหรับเจ้าหน้าที่ OSO ทั้งเก่าและใหม่',
-        remark:'- เบส Consult', responsible:'พิมพ์', googleEventId:null, syncCal:true
+        remark:'- เบส Consult', responsible:['พิมพ์'], googleEventId:null, syncCal:true
       },
       {
         id:'2', status:'Completed', target:'', category:'ทุก ๆ ครั้งที่จะมี New OSO',
         project:'ALL Project', taskName:'การทดสอบ New OSO',
         detail:'**การจัดคนเข้าปฏิบัติงานเป็น Onsite Support Officer (OSO) ที่ห้อง CCOC ทำอากาศยานสุวรรณภูมิ มีขั้นตอนดังนี้** :note:\n1. หัวหน้างานแต่ละทีมประเมินเสนอชื่อพนักงานที่จะเข้ารับการประเมินการจัดตารางเข้า OSO และจัดประเมินภายในทีม (ใช้ Form การประเมินจากทีม OSO)\n2. หลังจากมีการประเมินจากแต่ละทีมแล้ว Senior OSO ชี้แจงผลการประเมิน "ผ่าน" :check: หรือ "ไม่ผ่าน" :cross_mark:\n3. Senior OSO จัดสอบวัดข้อมูลพื้นฐาน โดยแจ้งวันและเวลาที่จะจัดสอบ ห้องสอบ หัวข้อที่จะจัดสอบ เพื่อให้พนักงานเตรียมตัวล่วงหน้า\n4. Senior OSO แจ้งผลการสอบกับพนักงานทันที หากสอบไม่ผ่าน ให้สอบอีกครั้ง หากสอบทั้ง 2 รอบแล้วยังไม่ผ่าน ให้รออีก 6 เดือน แล้วหัวหน้างานแต่ละทีมประเมินใหม่อีกครั้ง\n5. กรณีสอบผ่าน จะมีการจัดตารางเข้าอบรมการปฏิบัติงาน OSO (8 ชม.) จำนวน 2 วัน และจัดตารางเข้า OSO (12 ชม.) ในลำดับถัดไป',
-        remark:'21/11/2025 วรรณศิลป์ ผ่าน\n08/01/2026 ปวริศ = ผ่าน', responsible:'OSO Team', googleEventId:null, syncCal:true
+        remark:'21/11/2025 วรรณศิลป์ ผ่าน\n08/01/2026 ปวริศ = ผ่าน', responsible:['OSO Team'], googleEventId:null, syncCal:true
       },
       {
         id:'3', status:'Specific Period', target:'2026-01-01', category:'ทุก 6 เดือน',
         project:'ALL Project', taskName:'การอบรมทวนหน้าที่ OSO / Recurrent for OSO (ทุก 6 เดือน)',
         detail:'การอบรมทวนหน้าที่ OSO / Recurrent การปฏิบัติงาน Onsite Support\n1. ทบทวนด้วยสไลด์อบรมพนักงาน OSO\n2. ให้ทำข้อสอบ OSO ผ่านเกณฑ์การให้คะแนน (พีแนนกำหนดให้ 90%)\n3. รีวิวข้อสอบทุกครั้งก่อนจัดสอบ\n4. ใช้เวลาไม่เกินครึ่งวัน\n5. กรณีไม่ผ่านการทดสอบ จะให้ทดสอบอีกครั้ง\n6. หากยังไม่ผ่านอีก จะให้ลดการเข้ากะที่ % ..... หรือกรณีต่ำกว่า ... % ไม่จัดให้เข้ากะ (Case by Case - Senior พิจารณา)\n----------------\n*อยู่ระหว่างคุณพิมพ์มาตาคัดคำถาม แบ่งเป็นจำนวนดังนี้*\nAPPS & PNR = 20 ข้อ\nPIBICS = 10 ข้อ\nTDAC = 10 ข้อ\n\nรอบที่ 1 - รอดูตารางงานเดือน2-3/2026\nรอบที่ 2 - รอดูตารางงานเดือนกรกฏาคม 2026\n\n22/2/2026 ขอเวลาไม่เกิน 1 ชั่วโมง',
         remark:'- ทบทวนในวันที่ประชุม OSO เดือนมกราคม 2569\n- สอบ OSO เดือนกุมภาพันธ์ 2569 ผ่าน Google form อยู่ระหว่างจัดทำ\n- พีแนน Thai APPS & PNR\n- เบส PIBICS + TDAC\n- อยู่ระหว่างคุณพิมพ์มาดาคัดคำถามเพื่อนำลง GG Form',
-        responsible:'OSO Team', googleEventId:null, syncCal:true
+        responsible:['OSO Team'], googleEventId:null, syncCal:true
       }
     ]
   };
@@ -790,6 +802,8 @@ async function loadState(){
       if(!Array.isArray(state.statuses) || !state.statuses.length) state.statuses = DEFAULT_STATUSES.slice();
       state.projects = migrateNameColorList(state.projects, defaultState().projects);
       state.responsibles = migrateNameColorList(state.responsibles, defaultState().responsibles);
+      normalizeTaskListResponsibles(state.tasks);
+      normalizeTaskListResponsibles(state.deletedTasks);
       return;
     }
   }catch(e){ /* corrupted -> fall through to default */ }
@@ -863,7 +877,7 @@ function renderTable(){
   let rows = state.tasks.filter(t=>{
     if(activeStatusFilter !== 'ALL' && t.status !== activeStatusFilter) return false;
     if(search){
-      const hay = [t.taskName, t.detail, t.remark, t.category, t.project, t.responsible].join(' ').toLowerCase();
+      const hay = [t.taskName, t.detail, t.remark, t.category, t.project, ...(t.responsible||[])].join(' ').toLowerCase();
       if(!hay.includes(search)) return false;
     }
     return true;
@@ -923,16 +937,12 @@ function renderTable(){
   wrap.innerHTML = html;
 }
 
-function responsibleSelectHtml(t){
-  const current = t.responsible || '';
-  const names = state.responsibles.map(r=>r.name);
-  const options = names.includes(current) || !current
-    ? names
-    : [current, ...names];
-  const rd = responsibleDef(current);
-  return `<select class="responsible-select" data-id="${t.id}" style="background:${rd.bg}; color:${rd.fg};">
-    ${options.map(r=>`<option value="${escapeHtml(r)}" ${r===current?'selected':''}>${escapeHtml(r)}</option>`).join('')}
-  </select>`;
+function responsiblePillsHtml(t){
+  const names = (t.responsible && t.responsible.length) ? t.responsible : ['—'];
+  return `<div class="responsible-cell">${names.map(name=>{
+    const rd = responsibleDef(name === '—' ? '' : name);
+    return `<span class="pill pill-responsible" style="background:${rd.bg};color:${rd.fg};">${escapeHtml(name)}</span>`;
+  }).join('')}</div>`;
 }
 
 function rowHtml(t){
@@ -948,7 +958,7 @@ function rowHtml(t){
       <td><strong>${escapeHtml(t.taskName)}</strong></td>
       <td class="cell-detail">${escapeHtml(t.detail) || '<span class="muted-dash">—</span>'}</td>
       <td class="cell-remark">${escapeHtml(t.remark) || '<span class="muted-dash">—</span>'}</td>
-      <td>${responsibleSelectHtml(t)}</td>
+      <td>${responsiblePillsHtml(t)}</td>
       <td>
         <div class="row-actions">
           <button class="icon-btn" title="แก้ไข" onclick="openTaskModal('${t.id}')">
@@ -976,9 +986,19 @@ function populateSelectOptions(){
 
   const projSel = document.getElementById('f_project');
   projSel.innerHTML = state.projects.map(p=>`<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
+}
 
-  const respSel = document.getElementById('f_responsible');
-  respSel.innerHTML = state.responsibles.map(r=>`<option value="${escapeHtml(r.name)}">${escapeHtml(r.name)}</option>`).join('');
+function renderResponsibleCheckboxes(selected){
+  const el = document.getElementById('f_responsible_list');
+  el.innerHTML = state.responsibles.map(r=>{
+    const checked = selected.includes(r.name) ? 'checked' : '';
+    return `
+    <label class="checkbox-item">
+      <input type="checkbox" value="${escapeHtml(r.name)}" ${checked}>
+      <span class="dot" style="background:${r.bg}; border:1px solid ${r.fg};"></span>
+      ${escapeHtml(r.name)}
+    </label>`;
+  }).join('');
 }
 
 function openTaskModal(id){
@@ -998,7 +1018,7 @@ function openTaskModal(id){
     document.getElementById('f_taskname').value = t.taskName || '';
     document.getElementById('f_detail').value = t.detail || '';
     document.getElementById('f_remark').value = t.remark || '';
-    document.getElementById('f_responsible').value = t.responsible || (state.responsibles[0] && state.responsibles[0].name) || '';
+    renderResponsibleCheckboxes(t.responsible || []);
     document.getElementById('f_syncCal').checked = t.syncCal !== false;
   }else{
     title.textContent = 'เพิ่มงานใหม่';
@@ -1010,7 +1030,7 @@ function openTaskModal(id){
     document.getElementById('f_taskname').value = '';
     document.getElementById('f_detail').value = '';
     document.getElementById('f_remark').value = '';
-    document.getElementById('f_responsible').value = (state.responsibles[0] && state.responsibles[0].name) || '';
+    renderResponsibleCheckboxes(state.responsibles[0] ? [state.responsibles[0].name] : []);
     document.getElementById('f_syncCal').checked = true;
   }
   overlay.classList.add('show');
@@ -1139,7 +1159,7 @@ async function saveTaskFromModal(){
     taskName: taskName,
     detail: document.getElementById('f_detail').value,
     remark: document.getElementById('f_remark').value,
-    responsible: document.getElementById('f_responsible').value,
+    responsible: Array.from(document.querySelectorAll('#f_responsible_list input:checked')).map(cb=>cb.value),
     syncCal: document.getElementById('f_syncCal').checked,
   };
 
@@ -1183,7 +1203,7 @@ function renderHistoryList(){
         <span style="font-size:12px;color:var(--muted);">ลบเมื่อ ${escapeHtml(when)}</span>
       </div>
       <div style="font-size:12.5px;color:var(--muted);">
-        Project: ${escapeHtml(t.project || '—')} · ผู้รับผิดชอบ: ${escapeHtml(t.responsible || '—')}
+        Project: ${escapeHtml(t.project || '—')} · ผู้รับผิดชอบ: ${escapeHtml((t.responsible||[]).join(', ') || '—')}
       </div>
       <div style="display:flex; gap:8px;">
         <button class="btn btn-ghost btn-sm" onclick="restoreTask('${t.id}')">กู้คืน</button>
@@ -1290,7 +1310,7 @@ function renderRespList(){
       if(!newVal){ e.target.value = oldVal; return; }
       const newArr = state.responsibles.map(r=>Object.assign({}, r));
       newArr[idx].name = newVal;
-      state.tasks.forEach(t=>{ if(t.responsible === oldVal) t.responsible = newVal; });
+      state.tasks.forEach(t=>{ if(Array.isArray(t.responsible) && t.responsible.includes(oldVal)) t.responsible = t.responsible.map(r=>r===oldVal?newVal:r); });
       await persistResponsibles(newArr);
       renderTable();
     });
@@ -1486,6 +1506,7 @@ function exportToExcel(){
     const header = selectedCols.map(c=>c.label);
     const rows = selectedTasks.map(t=>selectedCols.map(c=>{
       if(c.key === 'status') return statusDef(t.status).label;
+      if(c.key === 'responsible') return (t.responsible||[]).join(', ');
       return t[c.key] || '';
     }));
     const ws = XLSX.utils.aoa_to_sheet([header, ...rows]);
@@ -1511,6 +1532,7 @@ function buildReportSheet(selectedCols, tasks){
       let value = t[c.key] || '';
       if(c.key === 'status') value = statusDef(t.status).label;
       if(c.key === 'target') value = t.target ? formatThaiDatePlain(t.target) : '';
+      if(c.key === 'responsible') value = (t.responsible||[]).join(', ');
       aoa.push([label, value]);
     });
 
@@ -1585,6 +1607,8 @@ function importBackupJson(file){
         if(!Array.isArray(state.statuses) || !state.statuses.length) state.statuses = DEFAULT_STATUSES.slice();
         if(!Array.isArray(state.tasks)) state.tasks = [];
         if(!Array.isArray(state.deletedTasks)) state.deletedTasks = [];
+        normalizeTaskListResponsibles(state.tasks);
+        normalizeTaskListResponsibles(state.deletedTasks);
         const maxId = state.tasks.reduce((m,t)=>Math.max(m, parseInt(t.id,10) || 0), 0);
         state.nextId = maxId + 1;
         await saveState();
@@ -1670,14 +1694,14 @@ function attachFirebaseListeners(){
   fbRefs.tasks = d.ref('tasks');
   fbRefs.tasks.on('value', snap=>{
     const val = snap.val() || {};
-    state.tasks = Object.keys(val).map(id=>Object.assign({id}, val[id]));
+    state.tasks = normalizeTaskListResponsibles(Object.keys(val).map(id=>Object.assign({id}, val[id])));
     renderTable();
   });
   fbRefs.deletedTasks = d.ref('deletedTasks');
   fbRefs.deletedTasks.on('value', snap=>{
     const val = snap.val() || {};
-    state.deletedTasks = Object.keys(val).map(id=>Object.assign({id}, val[id]))
-      .sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||''));
+    state.deletedTasks = normalizeTaskListResponsibles(Object.keys(val).map(id=>Object.assign({id}, val[id]))
+      .sort((a,b)=>(b.deletedAt||'').localeCompare(a.deletedAt||'')));
     renderHistoryList();
   });
 }
@@ -1880,7 +1904,7 @@ function buildEventPayload(t){
   const lines = [];
   if(t.category) lines.push(`หมวดหมู่/Routine: ${t.category}`);
   lines.push(`Project: ${t.project || '-'}`);
-  lines.push(`ผู้รับผิดชอบ: ${t.responsible || '-'}`);
+  lines.push(`ผู้รับผิดชอบ: ${(t.responsible||[]).join(', ') || '-'}`);
   if(t.detail) lines.push(`\nรายละเอียด:\n${t.detail}`);
   if(t.remark) lines.push(`\nหมายเหตุ:\n${t.remark}`);
   return {
@@ -2011,14 +2035,6 @@ async function init(){
   });
 
   document.getElementById('searchInput').addEventListener('input', renderTable);
-
-  document.getElementById('groupsWrap').addEventListener('change', async (e)=>{
-    if(!e.target.classList.contains('responsible-select')) return;
-    const id = e.target.getAttribute('data-id');
-    const newVal = e.target.value;
-    const t = await persistUpdateTask(id, { responsible: newVal });
-    if(t) syncTaskToCalendar(t).then(renderTable);
-  });
 
   document.getElementById('btnExportExcel').addEventListener('click', openExportModal);
   document.getElementById('btnCancelExport').addEventListener('click', closeExportModal);
